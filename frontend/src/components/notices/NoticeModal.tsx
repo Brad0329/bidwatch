@@ -231,21 +231,41 @@ export default function NoticeModal({ notice: initialNotice, onClose }: Props) {
 }
 
 /* 나라장터 전용 상세 필드 */
-/* 실제 DB extra 키: bid_method, bid_type, budget, contact, est_price, open_date */
+/* 실제 DB extra 키: bid_method, bid_type, budget, contract_method, award_method,
+   contact, contact_email, est_price, open_date, tech_eval_ratio, price_eval_ratio, bid_qual */
 function NaraExtra({ ex }: { ex: Record<string, string | number | null> }) {
-  const hasAny = ex.est_price || ex.bid_method || ex.bid_type || ex.open_date || ex.contact;
+  const hasAny =
+    ex.est_price || ex.bid_method || ex.bid_type || ex.open_date ||
+    ex.contract_method || ex.award_method || ex.contact ||
+    ex.tech_eval_ratio || ex.price_eval_ratio || ex.bid_qual;
 
   if (!hasAny) return null;
+
+  // 기술:가격 평가비율을 한 줄로 표시
+  const evalRatio =
+    ex.tech_eval_ratio && ex.price_eval_ratio
+      ? `기술 ${ex.tech_eval_ratio}% : 가격 ${ex.price_eval_ratio}%`
+      : ex.tech_eval_ratio
+        ? `기술 ${ex.tech_eval_ratio}%`
+        : ex.price_eval_ratio
+          ? `가격 ${ex.price_eval_ratio}%`
+          : null;
 
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-700 mb-2">나라장터 상세</h3>
       <div className="grid grid-cols-2 gap-x-6 gap-y-2">
         {ex.est_price && <InfoRow label="추정 가격" value={formatPrice(ex.est_price)} />}
+        {ex.budget && <InfoRow label="배정 예산" value={formatPrice(ex.budget)} />}
         {ex.bid_type && <InfoRow label="입찰 구분" value={String(ex.bid_type)} />}
         {ex.bid_method && <InfoRow label="입찰 방식" value={String(ex.bid_method)} />}
+        {ex.contract_method && <InfoRow label="계약 방식" value={String(ex.contract_method)} />}
+        {ex.award_method && <InfoRow label="낙찰 방식" value={String(ex.award_method)} />}
+        {evalRatio && <InfoRow label="평가 비율" value={evalRatio} />}
         {ex.open_date && <InfoRow label="개찰 일시" value={String(ex.open_date)} />}
+        {ex.bid_qual && <InfoRow label="입찰자격 등록일" value={String(ex.bid_qual)} />}
         {ex.contact && <InfoRow label="담당자" value={String(ex.contact)} />}
+        {ex.contact_email && <InfoRow label="담당자 이메일" value={String(ex.contact_email)} />}
       </div>
     </div>
   );
