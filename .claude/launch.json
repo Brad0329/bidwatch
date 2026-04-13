@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "C:/Users/user/Documents/bidwatch/backend/.venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100", "--reload"],
+      "port": 8100,
+      "cwd": "C:/Users/user/Documents/bidwatch/backend"
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "3000"],
+      "port": 3000,
+      "cwd": "C:/Users/user/Documents/bidwatch/frontend"
+    },
+    {
+      "name": "prototype",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "C:/Users/user/Documents/bidwatch/prototype", "-l", "3456", "--no-clipboard"],
+      "port": 3456
+    }
+  ]
+}

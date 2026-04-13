@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BidWatch - 공고 목록</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+        sidebar: '#111827',
+      }
+    }
+  }
+}
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
+  body { font-family: 'Pretendard', -apple-system, sans-serif; }
+  .sidebar-item:hover { background: rgba(255,255,255,0.08); }
+  .sidebar-item.active { background: rgba(59,130,246,0.2); color: #60a5fa; }
+  .notice-row { transition: background 0.1s; }
+  .notice-row:hover { background: #f8fafc; }
+  .tag-review { background: #fef3c7; color: #92400e; }
+  .tag-bid { background: #d1fae5; color: #065f46; }
+  .tag-exclude { background: #fee2e2; color: #991b1b; }
+  .source-nara { background: #eff6ff; color: #1d4ed8; }
+  .source-kstartup { background: #ecfdf5; color: #047857; }
+  .source-bizinfo { background: #fef3c7; color: #92400e; }
+  .source-scraper { background: #f3e8ff; color: #7c3aed; }
+  .filter-chip { cursor: pointer; transition: all 0.15s; }
+  .filter-chip:hover { border-color: #3b82f6; }
+  .filter-chip.selected { background: #eff6ff; border-color: #3b82f6; color: #2563eb; }
+  .checkbox-cell { width: 40px; }
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="flex min-h-screen">
+
+  <!-- Sidebar -->
+  <aside class="w-60 bg-sidebar text-gray-300 flex flex-col fixed h-full z-10">
+    <div class="px-5 py-5 flex items-center gap-2.5 border-b border-gray-800">
+      <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+        <i class="ri-radar-line text-white text-lg"></i>
+      </div>
+      <span class="text-white font-bold text-lg tracking-tight">BidWatch</span>
+    </div>
+    <nav class="flex-1 py-4 px-3 space-y-1 text-sm">
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg" href="dashboard.html">
+        <i class="ri-dashboard-3-line text-base"></i> 대시보드
+      </a>
+      <a class="sidebar-item active flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-file-list-3-line text-base"></i> 공고 목록
+        <span class="ml-auto text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-medium">24</span>
+      </a>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-star-line text-base"></i> AI 매칭 공고
+        <span class="ml-auto text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full font-medium">PRO</span>
+      </a>
+      <div class="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">관리</div>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-chat-check-line text-base"></i> 검토요청
+        <span class="ml-auto text-xs bg-yellow-500 text-gray-900 px-1.5 py-0.5 rounded-full font-medium">3</span>
+      </a>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-checkbox-circle-line text-base"></i> 입찰대상
+      </a>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-close-circle-line text-base"></i> 제외 목록
+      </a>
+      <div class="pt-3 pb-1 px-3 text-xs text-gray-500 uppercase tracking-wider">설정</div>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-key-2-line text-base"></i> 키워드 관리
+      </a>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-global-line text-base"></i> 수집 출처
+      </a>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-user-settings-line text-base"></i> 회사 프로필
+      </a>
+      <a class="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-lg">
+        <i class="ri-settings-3-line text-base"></i> 설정
+      </a>
+    </nav>
+    <div class="border-t border-gray-800 px-4 py-3 flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">김</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-white text-sm font-medium truncate">김대표</div>
+        <div class="text-gray-500 text-xs truncate">(주)테크솔루션</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 ml-60">
+    <!-- Top Bar -->
+    <header class="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between sticky top-0 z-5">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">공고 목록</h1>
+        <p class="text-sm text-gray-500 mt-0.5">키워드 매칭 공고 24건 &middot; 전체 공고 698건</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="relative p-2 rounded-lg hover:bg-gray-100">
+          <i class="ri-notification-3-line text-gray-500 text-xl"></i>
+          <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+        </button>
+        <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+          <i class="ri-add-line"></i> URL 추가
+        </button>
+      </div>
+    </header>
+
+    <div class="p-8">
+      <!-- Search + Filters -->
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm mb-6">
+        <!-- Search Bar -->
+        <div class="px-6 py-4 border-b border-gray-100">
+          <div class="flex gap-3">
+            <div class="flex-1 relative">
+              <i class="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+              <input type="text" placeholder="공고명, 기관명, 키워드로 검색..." class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            <button class="px-4 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center gap-2">
+              <i class="ri-search-line"></i> 검색
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Row -->
+        <div class="px-6 py-3 flex items-center gap-6 text-sm">
+          <!-- 출처 필터 -->
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500 font-medium shrink-0">출처:</span>
+            <div class="flex gap-1.5">
+              <span class="filter-chip selected border rounded-full px-3 py-1 text-xs font-medium">전체</span>
+              <span class="filter-chip border border-gray-200 rounded-full px-3 py-1 text-xs font-medium text-gray-600">나라장터</span>
+              <span class="filter-chip border border-gray-200 rounded-full px-3 py-1 text-xs font-medium text-gray-600">K-Startup</span>
+              <span class="filter-chip border border-gray-200 rounded-full px-3 py-1 text-xs font-medium text-gray-600">기업마당</span>
+              <span class="filter-chip border border-gray-200 rounded-full px-3 py-1 text-xs font-medium text-gray-600">URL 구독</span>
+            </div>
+          </div>
+
+          <div class="h-5 w-px bg-gray-200"></div>
+
+          <!-- 상태 필터 -->
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500 font-medium shrink-0">상태:</span>
+            <div class="flex gap-1.5">
+              <span class="filter-chip selected border rounded-full px-3 py-1 text-xs font-medium">진행중</span>
+              <span class="filter-chip border border-gray-200 rounded-full px-3 py-1 text-xs font-medium text-gray-600">마감</span>
+              <span class="filter-chip border border-gray-200 rounded-full px-3 py-1 text-xs font-medium text-gray-600">전체</span>
+            </div>
+          </div>
+
+          <div class="h-5 w-px bg-gray-200"></div>
+
+          <!-- 기간 -->
+          <div class="flex items-center gap-2">
+            <span class="text-gray-500 font-medium shrink-0">기간:</span>
+            <select class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 focus:outline-none">
+              <option>최근 7일</option>
+              <option selected>최근 30일</option>
+              <option>최근 90일</option>
+            </select>
+          </div>
+
+          <div class="ml-auto flex items-center gap-2">
+            <span class="text-gray-500 font-medium text-xs shrink-0">정렬:</span>
+            <select class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 focus:outline-none">
+              <option>최신순</option>
+              <option>마감임박순</option>
+              <option>예산 높은순</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk Actions Bar -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-gray-500">선택된 공고에 태그 지정:</span>
+          <button class="tag-review text-xs px-3 py-1.5 rounded-md font-medium hover:opacity-80">검토요청</button>
+          <button class="tag-bid text-xs px-3 py-1.5 rounded-md font-medium hover:opacity-80">입찰대상</button>
+          <button class="tag-exclude text-xs px-3 py-1.5 rounded-md font-medium hover:opacity-80">제외</button>
+        </div>
+        <div class="text-sm text-gray-400">
+          총 24건 중 1-20
+        </div>
+      </div>
+
+      <!-- Notice Table -->
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <!-- Table Header -->
+        <div class="grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div class="flex items-center"><input type="checkbox" class="rounded border-gray-300"></div>
+          <div>공고명</div>
+          <div>발주기관</div>
+          <div class="text-right">예산</div>
+          <div class="text-center">출처</div>
+          <div class="text-center">마감일</div>
+          <div class="text-center">태그</div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">2026년 디지털전환 컨설팅 용역 위탁 사업</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">디지털전환</span>
+              <span class="text-blue-600 font-medium">컨설팅</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.09 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">한국정보통신산업진흥원</div>
+          <div class="text-sm text-gray-900 text-right font-medium">2.5억</div>
+          <div class="text-center"><span class="source-nara text-xs px-2 py-0.5 rounded font-medium">나라장터</span></div>
+          <div class="text-center">
+            <div class="text-xs text-red-600 font-semibold">D-3</div>
+            <div class="text-xs text-gray-400">04.14</div>
+          </div>
+          <div class="text-center"><span class="tag-review text-xs px-2 py-0.5 rounded font-medium">검토요청</span></div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">2026년 AI 기반 스타트업 성장지원 프로그램 공모</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">AI</span>
+              <span class="text-blue-600 font-medium">스타트업</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.10 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">중소벤처기업부</div>
+          <div class="text-sm text-gray-900 text-right font-medium">5억</div>
+          <div class="text-center"><span class="source-kstartup text-xs px-2 py-0.5 rounded font-medium">K-Startup</span></div>
+          <div class="text-center">
+            <div class="text-xs text-gray-600 font-medium">D-12</div>
+            <div class="text-xs text-gray-400">04.23</div>
+          </div>
+          <div class="text-center">—</div>
+        </div>
+
+        <!-- Row 3 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">콘텐츠 산업 ESG 경영 실태조사 및 가이드라인 수립 연구용역</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">ESG</span>
+              <span class="text-blue-600 font-medium">콘텐츠</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.08 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">한국콘텐츠진흥원</div>
+          <div class="text-sm text-gray-900 text-right font-medium">1.8억</div>
+          <div class="text-center"><span class="source-scraper text-xs px-2 py-0.5 rounded font-medium">URL구독</span></div>
+          <div class="text-center">
+            <div class="text-xs text-gray-600 font-medium">D-7</div>
+            <div class="text-xs text-gray-400">04.18</div>
+          </div>
+          <div class="text-center"><span class="tag-bid text-xs px-2 py-0.5 rounded font-medium">입찰대상</span></div>
+        </div>
+
+        <!-- Row 4 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">스마트시티 데이터 플랫폼 구축 사업</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">스마트시티</span>
+              <span class="text-blue-600 font-medium">데이터</span>
+              <span class="text-blue-600 font-medium">플랫폼</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.07 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">국토교통부</div>
+          <div class="text-sm text-gray-900 text-right font-medium">8.5억</div>
+          <div class="text-center"><span class="source-nara text-xs px-2 py-0.5 rounded font-medium">나라장터</span></div>
+          <div class="text-center">
+            <div class="text-xs text-red-600 font-semibold">D-1</div>
+            <div class="text-xs text-gray-400">04.12</div>
+          </div>
+          <div class="text-center">—</div>
+        </div>
+
+        <!-- Row 5 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">교육부 2026년 SW교육 선도학교 운영 지원 용역</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">교육</span>
+              <span class="text-blue-600 font-medium">SW</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.10 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">교육부</div>
+          <div class="text-sm text-gray-900 text-right font-medium">3.2억</div>
+          <div class="text-center"><span class="source-nara text-xs px-2 py-0.5 rounded font-medium">나라장터</span></div>
+          <div class="text-center">
+            <div class="text-xs text-gray-600 font-medium">D-15</div>
+            <div class="text-xs text-gray-400">04.26</div>
+          </div>
+          <div class="text-center"><span class="tag-review text-xs px-2 py-0.5 rounded font-medium">검토요청</span></div>
+        </div>
+
+        <!-- Row 6 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">공공데이터 활용 서비스 개발 용역</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">데이터</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.06 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">행정안전부</div>
+          <div class="text-sm text-gray-900 text-right font-medium">4.2억</div>
+          <div class="text-center"><span class="source-bizinfo text-xs px-2 py-0.5 rounded font-medium">기업마당</span></div>
+          <div class="text-center">
+            <div class="text-xs text-red-600 font-semibold">D-1</div>
+            <div class="text-xs text-gray-400">04.12</div>
+          </div>
+          <div class="text-center">—</div>
+        </div>
+
+        <!-- Row 7 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">2026년 클라우드 서비스 품질 인증 심사 지원 사업</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">클라우드</span>
+              <span class="text-blue-600 font-medium">인증</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.11 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">정보통신산업진흥원</div>
+          <div class="text-sm text-gray-900 text-right font-medium">8천만</div>
+          <div class="text-center"><span class="source-scraper text-xs px-2 py-0.5 rounded font-medium">URL구독</span></div>
+          <div class="text-center">
+            <div class="text-xs text-gray-600 font-medium">D-20</div>
+            <div class="text-xs text-gray-400">05.01</div>
+          </div>
+          <div class="text-center">—</div>
+        </div>
+
+        <!-- Row 8 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">2026 국가 R&D 성과관리 시스템 고도화 용역</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">SW개발</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.11 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">과학기술정보통신부</div>
+          <div class="text-sm text-gray-900 text-right font-medium">12억</div>
+          <div class="text-center"><span class="source-nara text-xs px-2 py-0.5 rounded font-medium">나라장터</span></div>
+          <div class="text-center">
+            <div class="text-xs text-gray-600 font-medium">D-25</div>
+            <div class="text-xs text-gray-400">05.06</div>
+          </div>
+          <div class="text-center">—</div>
+        </div>
+
+        <!-- Row 9 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">서울시 소상공인 디지털전환 지원사업 운영대행 위탁</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">디지털전환</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.10 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">서울산업진흥원</div>
+          <div class="text-sm text-gray-900 text-right font-medium">1.5억</div>
+          <div class="text-center"><span class="source-scraper text-xs px-2 py-0.5 rounded font-medium">URL구독</span></div>
+          <div class="text-center">
+            <div class="text-xs text-gray-600 font-medium">D-10</div>
+            <div class="text-xs text-gray-400">04.21</div>
+          </div>
+          <div class="text-center"><span class="tag-review text-xs px-2 py-0.5 rounded font-medium">검토요청</span></div>
+        </div>
+
+        <!-- Row 10 -->
+        <div class="notice-row grid grid-cols-[40px_1fr_160px_100px_80px_90px_80px] px-6 py-4 border-b border-gray-50 items-center cursor-pointer">
+          <div><input type="checkbox" class="rounded border-gray-300"></div>
+          <div class="min-w-0 pr-4">
+            <div class="text-sm font-medium text-gray-900 truncate">한국에너지기술연구원 데이터센터 인프라 구축 사업</div>
+            <div class="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+              <span class="text-blue-600 font-medium">데이터</span>
+              <span class="text-blue-600 font-medium">클라우드</span>
+              <span class="text-gray-300">|</span>
+              <span>2026.04.09 등록</span>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 truncate">한국에너지기술연구원</div>
+          <div class="text-sm text-gray-900 text-right font-medium">6.3억</div>
+          <div class="text-center"><span class="source-nara text-xs px-2 py-0.5 rounded font-medium">나라장터</span></div>
+          <div class="text-center">
+            <div class="text-xs text-gray-600 font-medium">D-18</div>
+            <div class="text-xs text-gray-400">04.29</div>
+          </div>
+          <div class="text-center"><span class="tag-exclude text-xs px-2 py-0.5 rounded font-medium">제외</span></div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex items-center justify-center mt-6 gap-1">
+        <button class="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
+          <i class="ri-arrow-left-s-line"></i>
+        </button>
+        <button class="w-9 h-9 flex items-center justify-center rounded-lg bg-blue-600 text-white text-sm font-medium">1</button>
+        <button class="w-9 h-9 flex items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 text-sm">2</button>
+        <button class="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100">
+          <i class="ri-arrow-right-s-line"></i>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
