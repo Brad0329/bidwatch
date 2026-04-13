@@ -40,3 +40,15 @@ async def get_current_tenant(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tenant not found")
 
     return tenant
+
+
+def require_role(*roles: str):
+    """역할 기반 접근 제어 의존성 팩토리."""
+    async def _check(user: User = Depends(get_current_user)) -> User:
+        if user.role not in roles:
+            raise HTTPException(status_code=403, detail="권한이 없습니다")
+        return user
+    return _check
+
+
+require_admin = require_role("owner", "admin")

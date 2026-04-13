@@ -273,31 +273,10 @@ async def get_notice(
         raise HTTPException(status_code=404, detail="공고를 찾을 수 없습니다")
 
     # 상세 보충: content가 비어있으면 bid-collectors fetch_detail 호출
-    # 나라장터는 목록 API에서 가져온 데이터가 전부 (상세 API 없음, 스크래핑 불가)
     source = await db.get(SystemSource, notice.source_id)
-    SKIP_DETAIL_TYPES = {"nara"}
-    if source and not notice.content and source.collector_type not in SKIP_DETAIL_TYPES:
-        detail = await _fetch_detail_via_collector(source.collector_type, notice.bid_no)
-        if detail:
-            if detail.get("content"):
-                notice.content = detail["content"]
-            # extra 병합
-            extra = dict(notice.extra or {})
-            for key, val in detail.items():
-                if key not in ("content", "attachments") and val and not extra.get(key):
-                    extra[key] = val
-            notice.extra = extra
-            # 추가 첨부파일 병합
-            if detail.get("attachments"):
-                existing = notice.attachments or []
-                existing_urls = {a["url"] for a in existing}
-                for att in detail["attachments"]:
-                    if att["url"] not in existing_urls:
-                        existing.append(att)
-                notice.attachments = existing
-            if detail.get("apply_url") and not notice.detail_url:
-                notice.detail_url = detail["apply_url"]
-            await db.commit()
+    if source:
+        from app.services.notice import enrich_notice_detail
+        await enrich_notice_detail(notice, source, db)
 
     # source_name
     source_name = source.name if source else ""
@@ -335,12 +314,3 @@ async def get_notice(
     )
 
 
-async def _fetch_detail_via_collector(collector_type: str, bid_no: str) -> dict | None:
-    """bid-collectors 패키지의 fetch_detail을 호출."""
-    from app.tasks.collect_api import _get_collector
-
-    try:
-        collector = _get_collector(collector_type)
-        return await collector.fetch_detail(bid_no)
-    except Exception:
-        return None

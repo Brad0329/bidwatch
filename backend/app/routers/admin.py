@@ -3,28 +3,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import require_admin
 from app.models.notice import BidNotice, SystemSource
 from app.models.scraper import ScraperRegistry, ScrapedNotice
 from app.models.tenant import User
-from app.schemas.admin import CollectionRunRequest, CollectionRunResponse, SystemSourceResponse
+from app.schemas.admin import CollectionRunRequest, CollectionRunResponse
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-
-async def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role not in ("owner", "admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
-
-
-@router.get("/collection/status", response_model=list[SystemSourceResponse])
-async def collection_status(
-    user: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(select(SystemSource).order_by(SystemSource.id))
-    return result.scalars().all()
 
 
 @router.post("/collection/run", response_model=CollectionRunResponse)

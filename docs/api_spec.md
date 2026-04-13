@@ -1,119 +1,101 @@
-# BidWatch API 설계
+# BidWatch API 명세
 
 > **관련 문서:** [system_design.md](system_design.md) — 전체 아키텍처, [db_schema.md](db_schema.md) — DB 스키마
 
-Backend: FastAPI, 인증: JWT (access + refresh token)
+Backend: FastAPI (Python 3.11), 인증: JWT (access 30분 + refresh 7일), 포트: 8100
 
 ---
 
-## 인증
+## 인증 (`/api/auth`)
 
 ```
-POST   /api/auth/register          회원가입
-POST   /api/auth/login             로그인 → JWT 발급
-POST   /api/auth/refresh           토큰 갱신
-POST   /api/auth/change-password   비밀번호 변경
+POST   /api/auth/register          회원가입 (tenant + owner 자동 생성)
+POST   /api/auth/login             로그인 → access_token + refresh_token
+POST   /api/auth/refresh           토큰 갱신 (refresh_token → 새 access/refresh)
+POST   /api/auth/change-password   비밀번호 변경 [인증 필요]
+GET    /api/auth/me                현재 사용자 정보 [인증 필요]
 ```
 
-## 공고 조회
+## 공고 조회 (`/api/notices`) [인증 필요]
 
 ```
-GET    /api/notices                 키워드 매칭된 공고 목록 (테넌트 키워드 자동 적용)
-GET    /api/notices/{id}            공고 상세
-GET    /api/notices/search?q=...    자유 텍스트 검색 (FTS)
-GET    /api/notices/matched         AI 매칭 공고 (프리미엄)
+GET    /api/notices                공고 목록 (구독 출처 + 키워드 자동매칭)
+                                   ?page=1&page_size=20&q=검색어&source_id=1&status=ongoing
+GET    /api/notices/pre-specs      입찰 예고(사전규격) 목록 (nara_prespec 고정)
+                                   ?page=1&page_size=20&q=검색어&status=ongoing
+GET    /api/notices/{id}           공고 상세 (content 없으면 fetch_detail로 보충 → DB 캐시)
 ```
 
-## 키워드 관리
+## 키워드 관리 (`/api/keywords`) [인증 필요]
 
 ```
-GET    /api/keywords                내 키워드 목록
-POST   /api/keywords                키워드 추가
-DELETE /api/keywords/{id}           키워드 삭제
-PATCH  /api/keywords/{id}           키워드 활성/비활성
+GET    /api/keywords               내 키워드 목록
+POST   /api/keywords               키워드 추가 (max_keywords 제한, 중복 체크)
+PATCH  /api/keywords/{id}          키워드 활성/비활성 토글
+DELETE /api/keywords/{id}          키워드 삭제
 ```
 
-## 태그/워크플로우
+## 출처 관리 (`/api/sources`) [인증 필요]
 
 ```
-GET    /api/tags                    내 태그 목록 (태그별 필터)
-POST   /api/tags                    태그 설정 (공고에 태그 부여)
-DELETE /api/tags/{id}               태그 해제
-GET    /api/tags/review             검토요청 공고 목록
-GET    /api/tags/bid                입찰대상 공고 목록
-GET    /api/tags/excluded           제외 공고 목록
+GET    /api/sources/system                     공공 API 출처 목록 + 수집 상태
+GET    /api/sources/system/subscriptions        내가 구독 중인 출처 ID 목록
+POST   /api/sources/system/{id}/subscribe       시스템 출처 구독
+DELETE /api/sources/system/{id}/unsubscribe     시스템 출처 구독 해제
+
+GET    /api/sources                             내 커스텀 스크래퍼 구독 목록
+POST   /api/sources                             URL 추가 → AI 분석 디스패치
+GET    /api/sources/{sub_id}                    구독 상세 (스크래퍼 상태 폴링)
+GET    /api/sources/{sub_id}/preview            스크래퍼 테스트 수집 미리보기
+POST   /api/sources/{sub_id}/confirm            미리보기 확인 후 구독 확정
+PATCH  /api/sources/{sub_id}                    구독 수정 (별칭, 활성/비활성)
+DELETE /api/sources/{sub_id}                    구독 해제 (soft delete)
 ```
 
-## 출처 관리
+## 관리자 (`/api/admin`) [인증 필요, owner/admin 역할]
 
 ```
-GET    /api/sources/system          공공 API 출처 목록 + 수집 상태 (나라장터, K-Startup 등)
-GET    /api/sources                 내 구독 출처 목록 + 수집 상태
-POST   /api/sources                 URL로 출처 추가 요청
-                                    → 기존 스크래퍼 있으면 즉시 구독, 없으면 AI 분석 시작
-GET    /api/sources/{sub_id}        구독 상세 (스크래퍼 상태, 수집 이력)
-GET    /api/sources/{sub_id}/preview  스크래퍼 테스트 수집 미리보기
-POST   /api/sources/{sub_id}/confirm  미리보기 확인 후 정식 구독
-PATCH  /api/sources/{sub_id}        구독 수정 (별칭, 활성/비활성)
-DELETE /api/sources/{sub_id}        구독 해제 (스크래퍼 자체는 유지, 구독만 제거)
+POST   /api/admin/collection/run    수동 수집 실행 (sync/async, 단일/전체)
+                                    body: {source_id?, days, sync}
+GET    /api/admin/collection/stats  수집 통계 (bid/scraped/scraper 건수)
 ```
 
-## 프로필 (프리미엄)
+## 기타
 
 ```
-GET    /api/profile                 회사 프로필 조회
-PUT    /api/profile                 프로필 저장/수정
-POST   /api/profile/match-preview   프로필로 매칭 미리보기 (즉시 실행)
+GET    /api/health                  서버 상태 확인
 ```
 
-## 구독/결제
+---
+
+## 프론트엔드 페이지 구성 (현재 구현)
 
 ```
-GET    /api/subscription            현재 구독 상태
-POST   /api/subscription/checkout   결제 시작 (토스페이먼츠)
-POST   /api/subscription/webhook    결제 웹훅
-POST   /api/subscription/cancel     구독 해지
+/                    인증 여부에 따라 /dashboard 또는 /login으로 리다이렉트
+/login               로그인
+/register            회원가입
+/dashboard           대시보드 (placeholder)
+/notices             공고 목록 (검색, 필터, 페이지네이션, 상세 모달)
+/pre-notices         입찰 예고 (사전규격 공고)
+/settings            사용자설정 (구독 출처 + 키워드 관리)
+/admin               관리자설정 (수집 관리) — owner/admin만 접근
 ```
 
-## 알림
+---
+
+## 미구현 API (향후)
 
 ```
-GET    /api/notifications/settings  알림 설정 조회
-PUT    /api/notifications/settings  알림 설정 변경
-GET    /api/notifications/history   발송 이력
-```
+-- 태그/워크플로우
+GET/POST/DELETE  /api/tags           공고 태그 관리 (검토요청/입찰대상/제외)
 
-## 관리자 (시스템)
+-- 프로필 (프리미엄)
+GET/PUT  /api/profile               회사 프로필 관리
+POST     /api/profile/match-preview 매칭 미리보기
 
-```
-GET    /api/admin/tenants           전체 테넌트 목록
-GET    /api/admin/collection/status 수집 상태 (공공 API + 스크래퍼 요약)
-POST   /api/admin/collection/run    공공 API 수동 수집 실행
-GET    /api/admin/collection/logs   수집 이력
-GET    /api/admin/scrapers          전체 스크래퍼 목록 (구독자 수, 상태, 최근 수집)
-GET    /api/admin/scrapers/{id}     스크래퍼 상세 (config, 구독 테넌트 목록, 수집 이력)
-GET    /api/admin/scrapers/health   전체 스크래퍼 건강 상태 (실패율, 최근 성공/실패)
-POST   /api/admin/scrapers/{id}/reanalyze  실패 스크래퍼 AI 재분석
-DELETE /api/admin/scrapers/{id}     스크래퍼 삭제 (구독자 0인 경우만)
-```
+-- 알림
+GET/PUT  /api/notifications/settings 알림 설정
 
-## 프론트엔드 페이지 구성
-
-```
-/ (랜딩)                     서비스 소개 + 요금제 + 회원가입 CTA
-/login                       로그인
-/register                    회원가입
-/dashboard                   대시보드 (카드: 신규공고, 매칭공고, 마감임박, 키워드 수)
-/notices                     공고 리스트 (키워드 매칭, 필터, 검색)
-/notices/{id}                공고 상세 (첨부파일, 태그 버튼)
-/matched                     AI 매칭 공고 (프리미엄)
-/review                      검토요청 공고 리스트
-/bid                         입찰대상 공고 리스트
-/excluded                    제외 공고 리스트
-/keywords                    키워드 관리
-/sources                     수집 출처 관리 + URL 추가
-/profile                     회사 프로필 (프리미엄)
-/settings                    알림 설정, 계정 관리
-/subscription                구독/결제 관리
-/team                        팀원 관리
+-- 구독/결제
+GET/POST /api/subscription          구독 관리 (토스페이먼츠)
 ```

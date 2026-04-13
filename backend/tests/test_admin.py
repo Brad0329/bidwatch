@@ -20,17 +20,6 @@ async def get_auth_headers(client: AsyncClient) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_collection_status(client: AsyncClient):
-    headers = await get_auth_headers(client)
-    resp = await client.get("/api/admin/collection/status", headers=headers)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert isinstance(data, list)
-    # alembic 마이그레이션으로 시드된 경우 5개, 테스트에서는 0일 수 있음
-    assert len(data) >= 0
-
-
-@pytest.mark.asyncio
 async def test_collection_stats(client: AsyncClient):
     headers = await get_auth_headers(client)
     resp = await client.get("/api/admin/collection/stats", headers=headers)
