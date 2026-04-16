@@ -7,10 +7,27 @@ from app.deps import get_current_user
 from app.models.keyword import TenantKeyword
 from app.models.notice import BidNotice, SystemSource
 from app.models.subscription import TenantSystemSubscription
+from app.models.tag import TenantTag
 from app.models.tenant import User
 from app.schemas.notice import BidNoticeResponse, NoticeListResponse
 
 router = APIRouter(prefix="/api/notices", tags=["notices"])
+
+
+async def _build_tag_map(
+    db: AsyncSession, tenant_id: int, notice_type: str, notice_ids: list[int]
+) -> dict[int, str]:
+    """공고 ID 목록에 대한 태그 맵 반환."""
+    if not notice_ids:
+        return {}
+    result = await db.execute(
+        select(TenantTag.notice_id, TenantTag.tag).where(
+            TenantTag.tenant_id == tenant_id,
+            TenantTag.notice_type == notice_type,
+            TenantTag.notice_id.in_(notice_ids),
+        )
+    )
+    return {row[0]: row[1] for row in result.all()}
 
 
 def _match_keywords(title: str, content: str, keywords: list[str]) -> list[str]:
@@ -26,6 +43,7 @@ async def list_notices(
     q: str | None = None,
     source_id: int | None = None,
     status: str | None = None,
+    tag: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -106,6 +124,16 @@ async def list_notices(
         query = query.where(combined)
         count_query = count_query.where(combined)
 
+    # 태그 필터: 태그가 있는 공고만 또는 특정 태그
+    if tag:
+        tagged_ids_q = select(TenantTag.notice_id).where(
+            TenantTag.tenant_id == user.tenant_id,
+            TenantTag.notice_type == "bid",
+            TenantTag.tag == tag,
+        )
+        query = query.where(BidNotice.id.in_(tagged_ids_q))
+        count_query = count_query.where(BidNotice.id.in_(tagged_ids_q))
+
     # 총 건수
     total = await db.scalar(count_query) or 0
 
@@ -119,7 +147,11 @@ async def list_notices(
     result = await db.execute(query)
     notices = result.scalars().all()
 
-    # 5. 응답 구성: 출처명 + 매칭 키워드 추가
+    # 5. 태그 일괄 조회
+    notice_ids = [n.id for n in notices]
+    tag_map = await _build_tag_map(db, user.tenant_id, "bid", notice_ids)
+
+    # 6. 응답 구성: 출처명 + 매칭 키워드 + 태그
     items = []
     for n in notices:
         matched = _match_keywords(n.title, n.content or "", keywords) if keywords else []
@@ -141,6 +173,7 @@ async def list_notices(
             category=n.category or "",
             collected_at=n.collected_at,
             matched_keywords=matched,
+            tag=tag_map.get(n.id),
             attachments=n.attachments,
             extra=n.extra,
         ))
@@ -162,6 +195,7 @@ async def list_pre_spec_notices(
     page_size: int = Query(20, ge=1, le=100),
     q: str | None = None,
     status: str | None = None,
+    tag: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -216,6 +250,16 @@ async def list_pre_spec_notices(
         query = query.where(combined)
         count_query = count_query.where(combined)
 
+    # 태그 필터
+    if tag:
+        tagged_ids_q = select(TenantTag.notice_id).where(
+            TenantTag.tenant_id == user.tenant_id,
+            TenantTag.notice_type == "bid",
+            TenantTag.tag == tag,
+        )
+        query = query.where(BidNotice.id.in_(tagged_ids_q))
+        count_query = count_query.where(BidNotice.id.in_(tagged_ids_q))
+
     total = await db.scalar(count_query) or 0
 
     query = (
@@ -226,6 +270,9 @@ async def list_pre_spec_notices(
 
     result = await db.execute(query)
     notices = result.scalars().all()
+
+    notice_ids = [n.id for n in notices]
+    tag_map = await _build_tag_map(db, user.tenant_id, "bid", notice_ids)
 
     items = []
     for n in notices:
@@ -248,6 +295,7 @@ async def list_pre_spec_notices(
             category=n.category or "",
             collected_at=n.collected_at,
             matched_keywords=matched,
+            tag=tag_map.get(n.id),
             attachments=n.attachments,
             extra=n.extra,
         ))
@@ -291,6 +339,16 @@ async def get_notice(
     keywords = [row[0] for row in kw_result.all()]
     matched = _match_keywords(notice.title, notice.content or "", keywords) if keywords else []
 
+    # 태그 조회
+    tag_result = await db.execute(
+        select(TenantTag.tag).where(
+            TenantTag.tenant_id == user.tenant_id,
+            TenantTag.notice_type == "bid",
+            TenantTag.notice_id == notice.id,
+        )
+    )
+    notice_tag = tag_result.scalar_one_or_none()
+
     return BidNoticeResponse(
         id=notice.id,
         source_id=notice.source_id,
@@ -309,6 +367,7 @@ async def get_notice(
         category=notice.category or "",
         collected_at=notice.collected_at,
         matched_keywords=matched,
+        tag=notice_tag,
         attachments=notice.attachments,
         extra=notice.extra,
     )

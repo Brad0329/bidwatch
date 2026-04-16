@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/authStore";
 const NAV_ITEMS = [
   { href: "/dashboard", icon: "ri-dashboard-3-line", label: "대시보드" },
   { href: "/notices", icon: "ri-file-list-3-line", label: "공고 목록" },
+  { href: "/review", icon: "ri-checkbox-circle-line", label: "검토요청" },
   { href: "/pre-notices", icon: "ri-calendar-todo-line", label: "입찰 예고" },
 ];
 

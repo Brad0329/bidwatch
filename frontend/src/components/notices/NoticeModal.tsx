@@ -4,9 +4,19 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import type { BidNotice } from "@/types";
 
+const TAG_OPTIONS = ["검토요청", "입찰대상", "제외", "낙찰", "유찰"] as const;
+const TAG_COLORS: Record<string, string> = {
+  검토요청: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  입찰대상: "bg-blue-50 text-blue-700 border-blue-200",
+  제외: "bg-gray-100 text-gray-500 border-gray-200",
+  낙찰: "bg-green-50 text-green-700 border-green-200",
+  유찰: "bg-red-50 text-red-700 border-red-200",
+};
+
 interface Props {
   notice: BidNotice;
   onClose: () => void;
+  onTagChange?: () => void;
 }
 
 function formatBudget(budget: number | null): string {
@@ -26,9 +36,11 @@ function getDday(endDate: string | null): { text: string; color: string } {
   return { text: `D-${diff}`, color: "text-blue-600" };
 }
 
-export default function NoticeModal({ notice: initialNotice, onClose }: Props) {
+export default function NoticeModal({ notice: initialNotice, onClose, onTagChange }: Props) {
   const [notice, setNotice] = useState(initialNotice);
   const [loading, setLoading] = useState(false);
+  const [currentTag, setCurrentTag] = useState<string | null>(initialNotice.tag || null);
+  const [tagSaving, setTagSaving] = useState(false);
 
   // ESC 키로 닫기
   useEffect(() => {
@@ -50,7 +62,10 @@ export default function NoticeModal({ notice: initialNotice, onClose }: Props) {
     api
       .get<BidNotice>(`/api/notices/${initialNotice.id}`)
       .then((res) => {
-        if (!cancelled) setNotice(res.data);
+        if (!cancelled) {
+          setNotice(res.data);
+          setCurrentTag(res.data.tag || null);
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -58,6 +73,33 @@ export default function NoticeModal({ notice: initialNotice, onClose }: Props) {
       });
     return () => { cancelled = true; };
   }, [initialNotice.id]);
+
+  const handleTagChange = async (newTag: string) => {
+    if (tagSaving) return;
+    setTagSaving(true);
+    try {
+      if (newTag === currentTag) {
+        // 같은 태그 클릭 → 삭제
+        const tagRes = await api.get(`/api/tags/notice/bid/${notice.id}`);
+        if (tagRes.data) {
+          await api.delete(`/api/tags/${tagRes.data.id}`);
+        }
+        setCurrentTag(null);
+      } else {
+        await api.put("/api/tags", {
+          notice_type: "bid",
+          notice_id: notice.id,
+          tag: newTag,
+        });
+        setCurrentTag(newTag);
+      }
+      onTagChange?.();
+    } catch {
+      // 실패 시 무시
+    } finally {
+      setTagSaving(false);
+    }
+  };
 
   const dday = getDday(notice.end_date);
   const ex = (notice.extra || {}) as Record<string, string | number | null>;
@@ -102,6 +144,25 @@ export default function NoticeModal({ notice: initialNotice, onClose }: Props) {
           >
             <i className="ri-close-line text-xl"></i>
           </button>
+        </div>
+
+        {/* 태그 선택 */}
+        <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500 mr-1">태그</span>
+          {TAG_OPTIONS.map((t) => (
+            <button
+              key={t}
+              onClick={() => handleTagChange(t)}
+              disabled={tagSaving}
+              className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                currentTag === t
+                  ? TAG_COLORS[t]
+                  : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
+              } ${tagSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
 
         {/* Loading indicator */}

@@ -81,6 +81,7 @@ export interface BidNotice {
   category: string;
   collected_at: string | null;
   matched_keywords: string[];
+  tag: string | null;
   attachments: Array<{ name: string; url: string }> | null;
   extra: Record<string, unknown> | null;
 }

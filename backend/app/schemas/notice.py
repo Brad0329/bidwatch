@@ -21,6 +21,7 @@ class BidNoticeResponse(BaseModel):
     category: str
     collected_at: datetime | None
     matched_keywords: list[str] = []
+    tag: str | None = None
     attachments: list[dict] | None = None
     extra: dict | None = None
 

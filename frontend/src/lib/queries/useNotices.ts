@@ -8,6 +8,7 @@ interface NoticeParams {
   q?: string;
   source_id?: number;
   status?: string;
+  tag?: string;
   keyword_match?: boolean;
 }
 

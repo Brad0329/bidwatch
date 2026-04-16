@@ -2,33 +2,23 @@
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { usePreSpecNotices } from "@/lib/queries/useNotices";
+import { useNotices } from "@/lib/queries/useNotices";
 import NoticeTable from "@/components/notices/NoticeTable";
 import NoticeModal from "@/components/notices/NoticeModal";
 import type { BidNotice } from "@/types";
 
-const TAG_FILTERS = ["검토요청", "입찰대상", "제외", "낙찰", "유찰"] as const;
-const TAG_FILTER_COLORS: Record<string, string> = {
-  검토요청: "bg-yellow-50 text-yellow-700 border-yellow-300",
-  입찰대상: "bg-blue-50 text-blue-700 border-blue-300",
-  제외: "bg-gray-100 text-gray-600 border-gray-300",
-  낙찰: "bg-green-50 text-green-700 border-green-300",
-  유찰: "bg-red-50 text-red-700 border-red-300",
-};
-
-export default function PreNoticesPage() {
+export default function ReviewPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNotice, setSelectedNotice] = useState<BidNotice | null>(null);
-  const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = usePreSpecNotices({
+  const { data, isLoading } = useNotices({
     page,
     page_size: 20,
     q: searchQuery || undefined,
-    tag: tagFilter,
+    tag: "검토요청",
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -43,13 +33,8 @@ export default function PreNoticesPage() {
     setPage(1);
   };
 
-  const handleTagFilter = (t: string) => {
-    setTagFilter((prev) => (prev === t ? undefined : t));
-    setPage(1);
-  };
-
   const handleTagChange = () => {
-    queryClient.invalidateQueries({ queryKey: ["pre-spec-notices"] });
+    queryClient.invalidateQueries({ queryKey: ["notices"] });
   };
 
   const totalPages = data ? Math.ceil(data.total / data.page_size) : 0;
@@ -57,14 +42,14 @@ export default function PreNoticesPage() {
   return (
     <div>
       <header className="bg-white border-b border-gray-200 px-8 py-4">
-        <h1 className="text-xl font-bold text-gray-900">입찰 예고</h1>
+        <h1 className="text-xl font-bold text-gray-900">검토요청 공고</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          나라장터 사전규격 공고 {data ? `· 총 ${data.total}건` : ""}
+          검토요청 태그가 지정된 공고 {data ? `· 총 ${data.total}건` : ""}
         </p>
       </header>
 
       <div className="p-8">
-        {/* 검색 + 태그 필터 */}
+        {/* 검색 */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6">
           <form onSubmit={handleSearch} className="px-6 py-4 flex gap-3">
             <div className="flex-1 relative">
@@ -97,31 +82,6 @@ export default function PreNoticesPage() {
               </button>
             )}
           </form>
-          {/* 태그 필터 */}
-          <div className="px-6 pb-3 flex items-center gap-2">
-            <span className="text-xs text-gray-400 mr-1">태그 필터</span>
-            {TAG_FILTERS.map((t) => (
-              <button
-                key={t}
-                onClick={() => handleTagFilter(t)}
-                className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
-                  tagFilter === t
-                    ? TAG_FILTER_COLORS[t]
-                    : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-            {tagFilter && (
-              <button
-                onClick={() => { setTagFilter(undefined); setPage(1); }}
-                className="text-xs text-gray-400 hover:text-gray-600 ml-1"
-              >
-                <i className="ri-close-line"></i>
-              </button>
-            )}
-          </div>
           {searchQuery && (
             <div className="px-6 pb-3 text-sm text-gray-500">
               <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">
