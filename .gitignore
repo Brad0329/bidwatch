@@ -26,3 +26,6 @@ Thumbs.db
 
 # Alembic
 alembic/versions/__pycache__/
+
+# 로컬 개발 전용 스크립트 (비밀번호 해시 직접 교체 — 저장소에 두지 않는다)
+backend/scripts/set_password.py
