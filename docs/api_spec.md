@@ -2,7 +2,7 @@
 
 > **관련 문서:** [system_design.md](system_design.md) — 전체 아키텍처, [db_schema.md](db_schema.md) — DB 스키마
 
-Backend: FastAPI (Python 3.11), 인증: JWT (access 30분 + refresh 7일), 포트: 8100
+Backend: FastAPI (Python 3.11), 인증: JWT (access 30분 + refresh 7일), 포트: 9100
 
 ---
 

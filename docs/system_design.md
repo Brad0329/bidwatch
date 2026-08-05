@@ -28,10 +28,10 @@
 ```
 [사용자 브라우저]
     │
-    ├── [Frontend — Next.js (localhost:3000)]
+    ├── [Frontend — Next.js (localhost:9000)]
     │       App Router, TypeScript, Tailwind, Zustand, TanStack Query
     │
-    └── [Backend API — FastAPI (localhost:8100)]
+    └── [Backend API — FastAPI (localhost:9100)]
             │
             ├── Auth 모듈 (JWT access + refresh)
             ├── 역할 기반 접근 제어 (require_role → owner/admin/member)

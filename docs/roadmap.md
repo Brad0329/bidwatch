@@ -124,5 +124,9 @@ Phase 1-11: 배포
 | PostgreSQL | 16 (로컬) |
 | Redis | 미설치 (동기 수집 모드) |
 | bid-collectors | editable 설치 (`C:\Users\user\Documents\bid-collectors`) |
-| Backend | http://localhost:8100 |
-| Frontend | http://localhost:3000 (Next.js, TypeScript, Tailwind, Zustand, TanStack Query) |
+| Backend | http://localhost:9100 |
+| Frontend | http://localhost:9000 (Next.js, TypeScript, Tailwind, Zustand, TanStack Query) |
+| 프로토타입 | http://localhost:9456 |
+
+> 포트는 9000번대로 통일한다 (프론트 9000 / 백엔드 9100 / 프로토타입 9456).
+> 새 서비스를 추가할 때도 9000번대에서 고른다.

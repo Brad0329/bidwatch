@@ -4,22 +4,22 @@
     {
       "name": "backend",
       "runtimeExecutable": "C:/Users/user/Documents/bidwatch/backend/.venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100", "--reload"],
-      "port": 8100,
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9100", "--reload"],
+      "port": 9100,
       "cwd": "C:/Users/user/Documents/bidwatch/backend"
     },
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "3000"],
-      "port": 3000,
+      "runtimeArgs": ["run", "dev", "--", "--port", "9000"],
+      "port": 9000,
       "cwd": "C:/Users/user/Documents/bidwatch/frontend"
     },
     {
       "name": "prototype",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "C:/Users/user/Documents/bidwatch/prototype", "-l", "3456", "--no-clipboard"],
-      "port": 3456
+      "runtimeArgs": ["serve", "C:/Users/user/Documents/bidwatch/prototype", "-l", "9456", "--no-clipboard"],
+      "port": 9456
     }
   ]
 }
