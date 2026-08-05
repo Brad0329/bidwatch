@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotices } from "@/lib/queries/useNotices";
+import { useRegionPreference } from "@/lib/queries/useRegions";
+import RegionFilter from "@/components/filters/RegionFilter";
 import NoticeTable from "@/components/notices/NoticeTable";
 import NoticeModal from "@/components/notices/NoticeModal";
 import type { BidNotice } from "@/types";
@@ -12,13 +14,24 @@ export default function ReviewPage() {
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNotice, setSelectedNotice] = useState<BidNotice | null>(null);
+  const [regionFilter, setRegionFilter] = useState<string[]>([]);
+  const [regionInitialized, setRegionInitialized] = useState(false);
   const queryClient = useQueryClient();
+  const { data: preferredRegions } = useRegionPreference();
+
+  useEffect(() => {
+    if (!regionInitialized && preferredRegions) {
+      setRegionFilter(preferredRegions);
+      setRegionInitialized(true);
+    }
+  }, [preferredRegions, regionInitialized]);
 
   const { data, isLoading } = useNotices({
     page,
     page_size: 20,
     q: searchQuery || undefined,
     tag: "검토요청",
+    region: regionFilter.length > 0 ? regionFilter.join(",") : undefined,
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -82,6 +95,14 @@ export default function ReviewPage() {
               </button>
             )}
           </form>
+          {/* 지역 필터 */}
+          <div className="px-6 pb-3 flex items-center gap-2">
+            <span className="text-xs text-gray-400 mr-1">지역</span>
+            <RegionFilter
+              selected={regionFilter}
+              onChange={(regions) => { setRegionFilter(regions); setPage(1); }}
+            />
+          </div>
           {searchQuery && (
             <div className="px-6 pb-3 text-sm text-gray-500">
               <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">

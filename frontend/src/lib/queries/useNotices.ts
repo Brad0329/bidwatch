@@ -9,6 +9,7 @@ interface NoticeParams {
   source_id?: number;
   status?: string;
   tag?: string;
+  region?: string;
   keyword_match?: boolean;
 }
 

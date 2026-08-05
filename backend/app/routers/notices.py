@@ -10,8 +10,15 @@ from app.models.subscription import TenantSystemSubscription
 from app.models.tag import TenantTag
 from app.models.tenant import User
 from app.schemas.notice import BidNoticeResponse, NoticeListResponse
+from app.services.region import REGIONS
 
 router = APIRouter(prefix="/api/notices", tags=["notices"])
+
+
+@router.get("/regions")
+async def list_regions():
+    """사용 가능한 지역 목록 반환."""
+    return REGIONS
 
 
 async def _build_tag_map(
@@ -44,6 +51,7 @@ async def list_notices(
     source_id: int | None = None,
     status: str | None = None,
     tag: str | None = None,
+    region: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -134,6 +142,15 @@ async def list_notices(
         query = query.where(BidNotice.id.in_(tagged_ids_q))
         count_query = count_query.where(BidNotice.id.in_(tagged_ids_q))
 
+    # 지역 필터 (콤마 구분 다중 값)
+    if region:
+        region_list = [r.strip() for r in region.split(",") if r.strip()]
+        if region_list:
+            region_filters = [BidNotice.region.ilike(f"%{r}%") for r in region_list]
+            region_cond = or_(*region_filters)
+            query = query.where(region_cond)
+            count_query = count_query.where(region_cond)
+
     # 총 건수
     total = await db.scalar(count_query) or 0
 
@@ -196,6 +213,7 @@ async def list_pre_spec_notices(
     q: str | None = None,
     status: str | None = None,
     tag: str | None = None,
+    region: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -259,6 +277,15 @@ async def list_pre_spec_notices(
         )
         query = query.where(BidNotice.id.in_(tagged_ids_q))
         count_query = count_query.where(BidNotice.id.in_(tagged_ids_q))
+
+    # 지역 필터 (콤마 구분 다중 값)
+    if region:
+        region_list = [r.strip() for r in region.split(",") if r.strip()]
+        if region_list:
+            region_filters = [BidNotice.region.ilike(f"%{r}%") for r in region_list]
+            region_cond = or_(*region_filters)
+            query = query.where(region_cond)
+            count_query = count_query.where(region_cond)
 
     total = await db.scalar(count_query) or 0
 

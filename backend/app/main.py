@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import get_engine
-from app.routers import admin, auth, keywords, notices, sources, tags
+from app.routers import admin, auth, keywords, notices, profile, sources, tags
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(keywords.router)
 app.include_router(notices.router)
+app.include_router(profile.router)
 app.include_router(sources.router)
 app.include_router(tags.router)
 

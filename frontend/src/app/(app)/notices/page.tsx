@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotices } from "@/lib/queries/useNotices";
+import { useRegionPreference } from "@/lib/queries/useRegions";
+import RegionFilter from "@/components/filters/RegionFilter";
 import NoticeTable from "@/components/notices/NoticeTable";
 import NoticeModal from "@/components/notices/NoticeModal";
 import type { BidNotice } from "@/types";
@@ -22,13 +24,25 @@ export default function NoticesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNotice, setSelectedNotice] = useState<BidNotice | null>(null);
   const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
+  const [regionFilter, setRegionFilter] = useState<string[]>([]);
+  const [regionInitialized, setRegionInitialized] = useState(false);
   const queryClient = useQueryClient();
+  const { data: preferredRegions } = useRegionPreference();
+
+  // 설정의 관심 지역을 기본 필터로 자동 적용 (최초 1회)
+  useEffect(() => {
+    if (!regionInitialized && preferredRegions) {
+      setRegionFilter(preferredRegions);
+      setRegionInitialized(true);
+    }
+  }, [preferredRegions, regionInitialized]);
 
   const { data, isLoading } = useNotices({
     page,
     page_size: 20,
     q: searchQuery || undefined,
     tag: tagFilter,
+    region: regionFilter.length > 0 ? regionFilter.join(",") : undefined,
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -45,6 +59,11 @@ export default function NoticesPage() {
 
   const handleTagFilter = (t: string) => {
     setTagFilter((prev) => (prev === t ? undefined : t));
+    setPage(1);
+  };
+
+  const handleRegionFilter = (regions: string[]) => {
+    setRegionFilter(regions);
     setPage(1);
   };
 
@@ -97,9 +116,9 @@ export default function NoticesPage() {
               </button>
             )}
           </form>
-          {/* 태그 필터 */}
-          <div className="px-6 pb-3 flex items-center gap-2">
-            <span className="text-xs text-gray-400 mr-1">태그 필터</span>
+          {/* 태그 필터 + 지역 필터 */}
+          <div className="px-6 pb-3 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-400 mr-1">태그</span>
             {TAG_FILTERS.map((t) => (
               <button
                 key={t}
@@ -121,6 +140,9 @@ export default function NoticesPage() {
                 <i className="ri-close-line"></i>
               </button>
             )}
+            <span className="text-gray-200 mx-1">|</span>
+            <span className="text-xs text-gray-400 mr-1">지역</span>
+            <RegionFilter selected={regionFilter} onChange={handleRegionFilter} />
           </div>
           {searchQuery && (
             <div className="px-6 pb-3 text-sm text-gray-500">

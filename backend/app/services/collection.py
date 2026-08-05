@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.notice import BidNotice, SystemSource
 from app.models.scraper import ScrapedNotice
+from app.services.region import normalize_region
 
 logger = logging.getLogger("bidwatch.collection")
 
@@ -42,7 +43,7 @@ async def upsert_bid_notices(
             "detail_url": notice.detail_url,
             "content": notice.content,
             "budget": notice.budget,
-            "region": notice.region,
+            "region": normalize_region(notice.region),
             "category": notice.category,
             "attachments": [a for a in notice.attachments] if notice.attachments else None,
             "extra": notice.extra,
@@ -102,7 +103,7 @@ async def upsert_scraped_notices(
             "detail_url": notice.detail_url,
             "content": notice.content,
             "budget": notice.budget,
-            "region": notice.region,
+            "region": normalize_region(notice.region),
             "attachments": [a for a in notice.attachments] if notice.attachments else None,
             "extra": notice.extra,
         }
