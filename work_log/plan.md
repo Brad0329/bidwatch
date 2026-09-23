@@ -93,5 +93,11 @@
   같은 사이트도 실행마다 설정이 달라짐(gwto 14건→7건) / bid-collectors `create_client`가 커스텀 transport를
   써서 `verify_ssl=False`가 무시됨(dicia·jica 기준선 0건의 원인 — bid-collectors `152f930`에서 수정, 실측 0→10·0→9건).
   단 bidwatch `analyze_url`의 페이지 fetch는 여전히 SSL 검증을 켜므로 이 두 곳은 AI 분석 단계에서 실패한다.
+- **2차 실측 (2026-09-23, `566f144` 프롬프트·파싱·pagination 수정 후)** — 평가 가능 32곳(verify_ssl 수정으로
+  기준선 살아난 3곳 포함) 중 판정 SUCCESS 22곳. 1차와 같은 29곳 기준 13→22곳(45%→76%). "JSON 아님" 8→0.
+  PARTIAL 5곳의 제목을 직접 대조하니 4곳(gnto·jbba·keiti·sjtp)은 **손 설정이 틀리고 AI가 맞음**(분류 라벨·본문까지
+  긁던 정답 쪽 결함) → 실질 성공 **26/32(81%)**. 판정 스크립트는 제목 정확일치라 이런 경우를 PARTIAL로 잡는다.
+  남은 실패 6곳: analyze_url fetch의 SSL 검증 3곳(kcpi·dicia·jica) / POST 전용 2곳(itp·gntp) / 셀렉터가
+  일부 행만 잡음 1곳(ctp — 1차에는 30/30 성공, 실행 간 비결정성).
 - **SSRF 점검** — F-009는 사용자가 준 URL을 서버가 가져온다. 내부망 주소(localhost·사설 IP·메타데이터 주소) 차단 여부
   미확인. 늦어도 Phase 011 전체 리뷰에서, 가능하면 F-009를 다음에 건드릴 때 보안 ② 범위 점검.
