@@ -55,12 +55,18 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
     };
   }, [onClose]);
 
+  const noticeType = initialNotice.notice_type ?? "bid";
+
   // 상세 API 호출 (2단계 로딩: 리스트 데이터 즉시 표시 → 상세 보충)
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    const detailUrl =
+      noticeType === "scraped"
+        ? `/api/notices/scraped/${initialNotice.id}`
+        : `/api/notices/${initialNotice.id}`;
     api
-      .get<BidNotice>(`/api/notices/${initialNotice.id}`)
+      .get<BidNotice>(detailUrl)
       .then((res) => {
         if (!cancelled) {
           setNotice(res.data);
@@ -72,7 +78,7 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [initialNotice.id]);
+  }, [initialNotice.id, noticeType]);
 
   const handleTagChange = async (newTag: string) => {
     if (tagSaving) return;
@@ -80,14 +86,14 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
     try {
       if (newTag === currentTag) {
         // 같은 태그 클릭 → 삭제
-        const tagRes = await api.get(`/api/tags/notice/bid/${notice.id}`);
+        const tagRes = await api.get(`/api/tags/notice/${noticeType}/${notice.id}`);
         if (tagRes.data) {
           await api.delete(`/api/tags/${tagRes.data.id}`);
         }
         setCurrentTag(null);
       } else {
         await api.put("/api/tags", {
-          notice_type: "bid",
+          notice_type: noticeType,
           notice_id: notice.id,
           tag: newTag,
         });

@@ -19,13 +19,15 @@ GET    /api/auth/me                현재 사용자 정보 [인증 필요]
 ## 공고 조회 (`/api/notices`) [인증 필요]
 
 ```
-GET    /api/notices                공고 목록 (구독 출처 + 키워드 자동매칭)
+GET    /api/notices                공고 목록 (구독한 공공 출처 + URL 출처 합침, 키워드 자동매칭)
+                                   — 항목의 notice_type(bid|scraped)+id가 식별자, scraper_id로 URL 출처만 좁힘
                                    ?page=1&page_size=20&q=검색어&source_id=1&status=ongoing
                                    &tag=검토요청&region=서울,부산   (page_size 최대 100)
 GET    /api/notices/pre-specs      입찰 예고(사전규격) 목록 (nara_prespec 고정)
                                    ?page=1&page_size=20&q=검색어&status=ongoing&tag=...&region=...
 GET    /api/notices/regions        지역 목록 (17개 시/도 상수)
 GET    /api/notices/{id}           공고 상세 (content 없으면 fetch_detail로 보충 → DB 캐시)
+GET    /api/notices/scraped/{id}   URL 출처 공고 상세 (그 사이트를 구독한 회사만, 아니면 404)
 ```
 
 ## 태그 (`/api/tags`) [인증 필요]

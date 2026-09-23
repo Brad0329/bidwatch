@@ -61,7 +61,7 @@ export default function NoticeTable({ notices, onFilterByKeyword, onFilterByOrg,
         const dday = getDday(notice.end_date);
         return (
           <div
-            key={notice.id}
+            key={`${notice.notice_type}-${notice.id}`}
             className="grid grid-cols-[90px_1fr_120px_80px_80px_70px_130px] gap-3 px-6 py-3.5 border-b border-gray-50 items-center hover:bg-blue-50/50 transition-colors"
           >
             {/* 출처 */}

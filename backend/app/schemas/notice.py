@@ -4,6 +4,9 @@ from pydantic import BaseModel
 
 
 class BidNoticeResponse(BaseModel):
+    # "bid"(공공 API 출처) | "scraped"(직접 추가한 URL 출처) — 두 테이블은 id가 겹치므로 (notice_type, id)가 식별자.
+    # scraped면 source_id 자리에 scraper_id가 들어간다.
+    notice_type: str = "bid"
     id: int
     source_id: int
     source_name: str = ""
