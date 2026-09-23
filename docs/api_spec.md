@@ -1,6 +1,6 @@
 # BidWatch API 명세
 
-> **관련 문서:** [system_design.md](system_design.md) — 전체 아키텍처, [db_schema.md](db_schema.md) — DB 스키마
+> **관련 문서:** [system_design.md](system_design.md) — 전체 아키텍처, [SCHEMA.md](SCHEMA.md) — DB 스키마 결정
 
 Backend: FastAPI (Python 3.11), 인증: JWT (access 30분 + refresh 7일), 포트: 9100
 
@@ -21,9 +21,28 @@ GET    /api/auth/me                현재 사용자 정보 [인증 필요]
 ```
 GET    /api/notices                공고 목록 (구독 출처 + 키워드 자동매칭)
                                    ?page=1&page_size=20&q=검색어&source_id=1&status=ongoing
+                                   &tag=검토요청&region=서울,부산   (page_size 최대 100)
 GET    /api/notices/pre-specs      입찰 예고(사전규격) 목록 (nara_prespec 고정)
-                                   ?page=1&page_size=20&q=검색어&status=ongoing
+                                   ?page=1&page_size=20&q=검색어&status=ongoing&tag=...&region=...
+GET    /api/notices/regions        지역 목록 (17개 시/도 상수)
 GET    /api/notices/{id}           공고 상세 (content 없으면 fetch_detail로 보충 → DB 캐시)
+```
+
+## 태그 (`/api/tags`) [인증 필요]
+
+```
+GET    /api/tags                               테넌트 태그 목록 (?tag=검토요청)
+GET    /api/tags/notice/{notice_type}/{id}     공고 1건의 태그 (없으면 null)
+PUT    /api/tags                               태그 생성/변경 upsert (공고당 1개)
+                                               body: {notice_type: bid|scraped, notice_id, tag, memo?}
+DELETE /api/tags/{tag_id}                      태그 삭제
+```
+
+## 프로필 (`/api/profile`) [인증 필요]
+
+```
+GET    /api/profile/regions        관심 지역 조회
+PUT    /api/profile/regions        관심 지역 저장 (콤마 구분 문자열로 저장)
 ```
 
 ## 키워드 관리 (`/api/keywords`) [인증 필요]
@@ -77,7 +96,8 @@ GET    /api/health                  서버 상태 확인
 /dashboard           대시보드 (placeholder)
 /notices             공고 목록 (검색, 필터, 페이지네이션, 상세 모달)
 /pre-notices         입찰 예고 (사전규격 공고)
-/settings            사용자설정 (구독 출처 + 키워드 관리)
+/review              검토요청 (검토요청 태그 공고)
+/settings            사용자설정 (구독 출처 + 키워드 + 관심 지역)
 /admin               관리자설정 (수집 관리) — owner/admin만 접근
 ```
 
@@ -86,11 +106,8 @@ GET    /api/health                  서버 상태 확인
 ## 미구현 API (향후)
 
 ```
--- 태그/워크플로우
-GET/POST/DELETE  /api/tags           공고 태그 관리 (검토요청/입찰대상/제외)
-
 -- 프로필 (프리미엄)
-GET/PUT  /api/profile               회사 프로필 관리
+GET/PUT  /api/profile               회사 프로필 전체 관리 (현재는 /regions만 구현)
 POST     /api/profile/match-preview 매칭 미리보기
 
 -- 알림

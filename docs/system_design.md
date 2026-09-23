@@ -1,9 +1,9 @@
 # BidWatch - 입찰공고 모니터링 SaaS
 
 > **관련 문서:**
-> - [db_schema.md](db_schema.md) — PostgreSQL 테이블 DDL, 인덱스, 관계도
+> - [SCHEMA.md](SCHEMA.md) — 스키마 결정 기록 (컬럼 정의는 backend/app/models가 정답)
 > - [api_spec.md](api_spec.md) — API 엔드포인트 명세 + 프론트엔드 페이지 구성
-> - [roadmap.md](roadmap.md) — 개발 로드맵
+> - [../work_log/plan.md](../work_log/plan.md) — 전체 계획·Phase 체크리스트
 > - [interface.md](interface.md) — bid-collectors 패키지 인터페이스 정의
 
 ## 1. 서비스 개요
@@ -159,7 +159,7 @@ Claude API (Anthropic SDK)
 
 ## 6. 상세 문서
 
-- **DB 스키마:** [db_schema.md](db_schema.md) — 전체 테이블 DDL, 인덱스, 관계도, 구현 상태
+- **DB 스키마:** [SCHEMA.md](SCHEMA.md) — 설계 결정·관계·변경 이력
 - **API 명세:** [api_spec.md](api_spec.md) — 구현 완료/미구현 엔드포인트, 프론트 페이지 구성
-- **로드맵:** [roadmap.md](roadmap.md) — Phase 1~4 개발 계획, 진행 상태
+- **계획:** [../work_log/plan.md](../work_log/plan.md) — Phase 체크리스트, 이후 단계, 보류 항목
 - **인터페이스:** [interface.md](interface.md) — bid-collectors 패키지 인터페이스 정의
