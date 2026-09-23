@@ -4,8 +4,8 @@
 - check_url_syntax: 접수 시점, DNS 없이 — 스킴·호스트 형식·사설 IP 리터럴·내부용 호스트명
 - guard_request (httpx request 이벤트 훅): 실제 요청마다(리다이렉트 포함) 호스트를 풀어 공인 IP인지 확인
 
-남은 위험(2026-09-23 기준, plan.md 보류 항목): 확인과 접속 사이 DNS 재바인딩 / bid-collectors
-GenericScraper의 요청(시험·정기 수집)은 이 훅을 거치지 않는다 — 설정 URL만 사전 확인한다.
+bid-collectors v1.1부터 GenericScraper(시험·정기 수집·미리보기)에도 event_hooks로 이 훅을 건다.
+남은 위험(plan.md 보류 항목): 확인과 접속 사이 DNS 재바인딩.
 """
 
 import asyncio

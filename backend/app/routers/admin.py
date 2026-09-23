@@ -12,6 +12,14 @@ from app.schemas.admin import CollectionRunRequest, CollectionRunResponse
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+def _partial_note(result: dict) -> str:
+    """일부만 수집됐으면(페이지 실패·max_pages 절단) 그 사실을 메시지에 — 완료로만 보이지 않게."""
+    if not result.get("partial"):
+        return ""
+    errors = result.get("errors") or []
+    return f" (일부만 수집: {errors[0] if errors else '원인 미상'})"
+
+
 @router.post("/collection/run", response_model=CollectionRunResponse)
 async def collection_run(
     req: CollectionRunRequest,
@@ -52,19 +60,23 @@ async def collection_run(
                     if chained_error:
                         chained_msg = f" / {chained_source.name} 실패: {chained_error}"
                     else:
-                        chained_msg = f" / {chained_source.name} {chained_collected}건"
+                        chained_msg = (f" / {chained_source.name} {chained_collected}건"
+                                       f"{_partial_note(chained_result)}")
 
             return CollectionRunResponse(
                 status="completed",
-                message=f"{source.name} 수집 완료: {collected}건{chained_msg}",
+                message=f"{source.name} 수집 완료: {collected}건{_partial_note(result)}{chained_msg}",
             )
         else:
             results = await _collect_all_sources(req.days)
             total = sum(r.get("collected", 0) for r in results)
             errors = [r for r in results if r.get("error")]
+            partial = [r for r in results if r.get("partial")]
             msg = f"전체 수집 완료: {total}건"
             if errors:
                 msg += f" (실패 {len(errors)}건)"
+            if partial:
+                msg += f" (일부만 수집 {len(partial)}건)"
             return CollectionRunResponse(status="completed", message=msg)
     else:
         # 비동기 수집: Celery 태스크 디스패치

@@ -82,6 +82,52 @@ async def test_redirect_to_internal_address_is_blocked_before_sending(fake_dns):
     assert sent == ["public.example.com"]  # 내부 주소로는 요청이 나가지 않았다
 
 
+@pytest.fixture
+def redirect_server():
+    """127.0.0.1에서 모든 요청을 내부 주소(10.0.0.1)로 리다이렉트하는 서버."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    hits = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.path)
+            self.send_response(302)
+            self.send_header("Location", "http://10.0.0.1/admin")
+            self.end_headers()
+
+        def log_message(self, *args):  # 테스트 출력에 접속 로그를 섞지 않는다
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_address[1]}/board", hits
+    server.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_generic_scraper_redirect_to_internal_is_blocked(redirect_server):
+    # 실제 bid-collectors GenericScraper(v1.1 event_hooks) — 리다이렉트로 따라가는 요청에도 훅이 걸리는지
+    from bid_collectors import GenericScraper
+
+    list_url, hits = redirect_server
+    blocked = []
+
+    async def hook(request):
+        if request.url.host == "127.0.0.1":  # 테스트 서버만 통과, 나머지는 실제 guard
+            return
+        blocked.append(str(request.url))
+        await guard_request(request)
+
+    config = {"name": "t", "source_key": "t", "list_url": list_url,
+              "list_selector": "tr", "title_selector": "a", "date_selector": "td"}
+    result = await GenericScraper(config, event_hooks={"request": [hook]}).collect(days=30)
+    assert hits == ["/board"]
+    assert blocked == ["http://10.0.0.1/admin"]
+    assert result.notices == [] and result.is_partial and len(result.errors) == 1
+
+
 @pytest.mark.asyncio
 async def test_analysis_page_fetch_uses_the_guard(fake_dns):
     # 실제 분석 경로(fetch_page_html)가 훅을 달고 있는지 — 공인처럼 보이는 도메인이 사설 IP로 풀리는 경우

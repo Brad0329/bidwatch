@@ -36,6 +36,9 @@
   - 신규 공고 수, 키워드 매칭 수, 마감 임박, 출처별 수집 현황 카드
 - [ ] Phase 010: 자동 수집 (F-013)
   - Redis+Celery vs APScheduler 등 결정(→ '미정') · 정기 수집 1일 1~2회 · 수집 이력/로그
+  - 수집 이력의 "절단(max_pages)"과 "장애" 구분: bid-collectors v1.1은 둘 다 `is_partial`+errors이고 문구는 계약이 아니다
+    → 지금은 "errors 있고 0건 = 장애(error)", "notices 있고 partial = 일부 수집"으로만 나눈다. 알림에서 둘을 가르려면
+    bid-collectors에 구분 필드(예: `truncated`)를 요청한다. GenericScraper 기본 max_pages=3이라 절단이 잦을 수 있다.
 - [ ] Phase 011: 배포 — 보안 3층 ③ 전체 리뷰(`/security-review`) 통과가 선행 조건
   - Docker Compose(운영용) · 도메인 + SSL + Nginx · 베타 테스트
   - CLAUDE.md '배포 체크리스트' 2~4 채우기 · REQUIREMENTS '공개 범위' 확정
@@ -117,9 +120,9 @@
   8초 초과가 사라졌는지 확인하고 이 줄을 지운다.
 - **SSRF 남은 위험** (2026-09-23 접수·구독 작업에서 기본 방어 적용 — `services/url_guard.py`: 접수 시 형식 검사 +
   분석용 페이지 요청은 리다이렉트까지 매 요청 공인 IP 확인 + AI 설정의 list_url·session_init_url 사전 확인).
-  남은 것: ① 확인과 접속 사이 DNS 재바인딩 ② bid-collectors GenericScraper의 요청(시험·정기 수집)은 훅을 안 거쳐
-  **리다이렉트로 내부망에 갈 수 있다** — bid-collectors에 요청 훅 주입 인자를 추가해야 막힘(양쪽 저장소 작업).
-  Phase 011 전체 리뷰 전에 ②는 닫는다.
+  남은 것: ① 확인과 접속 사이 DNS 재바인딩(guard의 DNS 조회와 httpx의 조회가 따로다 — 접속 IP 고정이 필요).
+  (② GenericScraper 리다이렉트 경로는 2026-09-23 bid-collectors v1.1 `event_hooks`로 닫음 — 시험·정기 수집·미리보기 3곳,
+  실제 GenericScraper로 리다이렉트 차단 테스트 `test_generic_scraper_redirect_to_internal_is_blocked`)
 - **URL 수집 제목의 게시판 배지 글자**: "핫이슈"·"새글" 등이 제목에 붙어 저장된다(실측 강원관광재단·광주정보문화산업진흥원).
   키워드 매칭에는 해가 적지만 목록 표시·중복 판정(F-014)에 걸린다. AI 프롬프트에 배지 요소 제외 지시 또는 bid-collectors
   제목 추출 개선으로 — 공백 정규화(`clean_title`)도 원래는 수집기(bid-collectors) 책임이라 그쪽으로 옮길 후보.

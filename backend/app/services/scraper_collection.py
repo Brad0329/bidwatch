@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.database import get_session_factory
 from app.models.scraper import ScraperRegistry
 from app.services.collection import upsert_scraped_notices
-from app.services.url_guard import assert_safe_url
+from app.services.url_guard import assert_safe_url, guard_request
 
 logger = logging.getLogger("bidwatch.scraper_collection")
 
@@ -46,18 +46,23 @@ async def collect_scraper(
         config, name = dict(scraper.scraper_config), scraper.name
 
     try:
-        # 수집 요청은 bid-collectors가 보내 url_guard 훅을 안 거친다 — 요청할 URL을 매번 먼저 확인(DNS 변경 대비)
+        # 설정 URL은 먼저 확인해 명시적 error로 끝낸다. 리다이렉트 등 실제 요청은 guard_request 훅이 막는다
+        # (훅이 막으면 예외가 아니라 errors + 0건으로 돌아온다 — bid-collectors v1.1)
         for key in ("list_url", "session_init_url"):
             if config.get(key):
                 await assert_safe_url(config[key])
-        result = await GenericScraper(config).collect(days=days)
+        result = await GenericScraper(config, event_hooks={"request": [guard_request]}).collect(days=days)
     except Exception as e:
         logger.warning(f"[collect] {name}(scraper={scraper_id}) 수집 실패: {e}",
                        exc_info=not isinstance(e, ValueError))
         return {"status": "error", "error": str(e)}
 
+    if result.errors and not result.notices:
+        # 1페이지부터 실패(사이트 장애·차단된 요청) — "공고 없음"과 구분해 last_collected_*를 0으로 덮지 않는다
+        logger.warning(f"[collect] {name}(scraper={scraper_id}) 수집 실패(0건): errors={result.errors[:3]}")
+        return {"status": "error", "error": "; ".join(result.errors[:3]), "errors": result.errors}
     if result.errors or result.is_partial:
-        # bid-collectors v1.0은 페이지 요청 실패를 errors에 싣지 않는 경우가 있다(v1.1에서 보완 예정)
+        # max_pages 상한 절단 또는 N페이지 실패 — 받은 만큼 저장하고 사실을 남긴다
         logger.warning(f"[collect] {name}(scraper={scraper_id}) 부분 수집: "
                        f"{len(result.notices)}건, partial={result.is_partial}, errors={result.errors[:3]}")
 

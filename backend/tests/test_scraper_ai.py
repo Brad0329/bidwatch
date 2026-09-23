@@ -281,3 +281,23 @@ def test_user_message_reports_truncation_with_total_length():
     msg = build_user_message(URL, html)
     assert f"전체 {MAX_HTML_CHARS + 500}자 중 앞 {MAX_HTML_CHARS}자" in msg
     assert "x" * (MAX_HTML_CHARS + 1) not in msg
+
+
+@pytest.mark.asyncio
+async def test_trial_collect_uses_ssrf_hook_and_reports_request_failure(monkeypatch):
+    # v1.1: 차단·요청 실패는 0건 + errors로 온다 — "0건"으로 AI에 되묻지 않고 실제 원인을 탈락 사유로
+    from app.services.url_guard import guard_request
+
+    seen = {}
+
+    class FakeScraper:
+        def __init__(self, config, event_hooks=None):
+            seen["hooks"] = event_hooks
+
+        async def collect(self, days=30):
+            return SimpleNamespace(notices=[], errors=["페이지 1 요청 실패: 차단"], is_partial=True)
+
+    monkeypatch.setattr(scraper_ai, "GenericScraper", FakeScraper)
+    with pytest.raises(ValueError, match="요청 실패"):
+        await scraper_ai.trial_collect(dict(CONFIG))
+    assert seen["hooks"] == {"request": [guard_request]}

@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from app.database import get_session_factory
 from app.models.scraper import ScrapedNotice, ScraperRegistry
 from app.services import scraper_analysis, scraper_collection
-from app.services.url_guard import UnsafeUrlError
+from app.services.url_guard import UnsafeUrlError, guard_request
 
 CONFIG = {
     "name": "예시기관", "source_key": "example", "list_url": "https://example.go.kr/board",
@@ -27,17 +27,20 @@ def _notice(i: int) -> Notice:
 
 @pytest.fixture
 def fake_scraper(monkeypatch):
-    state = {"notices": [_notice(1), _notice(2)], "raise": None, "calls": 0, "blocked": set()}
+    state = {"notices": [_notice(1), _notice(2)], "errors": [], "raise": None, "calls": 0, "blocked": set(),
+             "hooks": None}
 
     class FakeScraper:
-        def __init__(self, config):
+        def __init__(self, config, event_hooks=None):
             self.config = config
+            state["hooks"] = event_hooks
 
         async def collect(self, days=30):
             state["calls"] += 1
             if state["raise"]:
                 raise state["raise"]
-            return SimpleNamespace(notices=state["notices"], errors=[], is_partial=False)
+            return SimpleNamespace(notices=state["notices"], errors=state["errors"],
+                                   is_partial=bool(state["errors"]))
 
     async def fake_guard(url):
         if any(b in url for b in state["blocked"]):
@@ -133,6 +136,36 @@ async def test_unsafe_config_url_is_not_requested(client: AsyncClient, fake_scra
     result = await scraper_collection.collect_scraper(scraper_id)
     assert result["status"] == "error"
     assert fake_scraper["calls"] == 1  # 수집 요청이 나가지 않았다
+
+
+@pytest.mark.asyncio
+async def test_collect_requests_go_through_ssrf_hook(client: AsyncClient, fake_scraper):
+    # 리다이렉트로 내부망에 가는 요청은 bid-collectors 훅으로만 막힌다 — 훅을 넘기는지
+    scraper_id = await _new_scraper(client)
+    await scraper_analysis.run_analysis(scraper_id)
+    assert fake_scraper["hooks"] == {"request": [guard_request]}
+
+
+@pytest.mark.asyncio
+async def test_request_failure_is_error_not_zero_notices(client: AsyncClient, fake_scraper):
+    # v1.1: 1페이지 실패는 0건 + errors — "공고 없음"으로 기록하면 사이트 장애가 가려진다
+    scraper_id = await _new_scraper(client)
+    await scraper_analysis.run_analysis(scraper_id)  # 첫 수집 2건
+    fake_scraper["notices"], fake_scraper["errors"] = [], ["페이지 1 요청 실패: 차단"]
+    result = await scraper_collection.collect_scraper(scraper_id)
+    assert result["status"] == "error"
+    assert (await _row(scraper_id)).last_collected_count == 2  # 0으로 덮지 않았다
+
+
+@pytest.mark.asyncio
+async def test_partial_collect_saves_and_reports(client: AsyncClient, fake_scraper):
+    # max_pages 절단·N페이지 실패 — 받은 만큼 저장하고 partial을 알린다
+    scraper_id = await _new_scraper(client)
+    fake_scraper["errors"] = ["max_pages=3 상한 도달로 중단"]
+    await scraper_analysis.run_analysis(scraper_id)
+    result = await scraper_collection.collect_scraper(scraper_id)
+    assert result["status"] == "ok" and result["partial"] is True
+    assert await _saved_count(scraper_id) == 2
 
 
 @pytest.mark.asyncio

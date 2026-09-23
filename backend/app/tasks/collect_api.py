@@ -86,8 +86,13 @@ async def _collect_source(source_id: int, collector_type: str, days: int = 1):
                 f"{result.duration_seconds}초"
             )
 
-            if result.errors:
-                logger.warning(f"[{collector.source_name}] 에러: {result.errors}")
+            if result.errors and not result.notices:
+                # 1페이지부터 실패(사이트 장애·쿼터 초과 등) — "공고 없음"과 구분해 수집 통계를 0으로 덮지 않는다
+                logger.error(f"[{collector.source_name}] 수집 실패(0건): {result.errors}")
+                return {"source": collector.source_name, "error": "; ".join(result.errors[:3])}
+            if result.errors or result.is_partial:
+                # N페이지 실패·max_pages 절단 등 — 받은 만큼 저장하고 사실을 응답에 싣는다 (errors의 API 키는 수집기가 가림)
+                logger.warning(f"[{collector.source_name}] 부분 수집: {result.errors}")
 
             async with session_factory() as db:
                 upsert_result = await upsert_bid_notices(result.notices, source_id, db)
@@ -99,6 +104,7 @@ async def _collect_source(source_id: int, collector_type: str, days: int = 1):
                 "collected": result.total_after_dedup,
                 "duration": result.duration_seconds,
                 "errors": result.errors,
+                "partial": result.is_partial,
             }
     except Exception as e:
         logger.error(f"[{collector_type}] 수집 실패: {e}")

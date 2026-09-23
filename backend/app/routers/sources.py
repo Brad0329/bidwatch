@@ -21,7 +21,7 @@ from app.schemas.source import (
 from app.services.scraper_ai import hash_url, normalize_url
 from app.services.scraper_analysis import run_analysis
 from app.services.source import find_or_create_scraper, subscribe, unsubscribe
-from app.services.url_guard import UnsafeUrlError, check_url_syntax
+from app.services.url_guard import UnsafeUrlError, check_url_syntax, guard_request
 
 logger = logging.getLogger("bidwatch.sources")
 
@@ -246,7 +246,7 @@ async def preview_scraper(
     from bid_collectors import GenericScraper
 
     try:
-        gs = GenericScraper(scraper.scraper_config)
+        gs = GenericScraper(scraper.scraper_config, event_hooks={"request": [guard_request]})
         collect_result = await gs.collect(days=30)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"스크래핑 실패: {e}")

@@ -252,8 +252,10 @@ def prefer_better_parser(config: dict, diag: dict, html: str) -> dict:
 
 
 async def trial_collect(config: dict) -> list[str]:
-    """설정으로 실제 수집해 본 제목 목록."""
-    result = await GenericScraper(config).collect(days=TRIAL_DAYS)
+    """설정으로 실제 수집해 본 제목 목록. 요청 자체가 실패(차단 포함)해 0건이면 ValueError — "공고 없음"과 구분."""
+    result = await GenericScraper(config, event_hooks={"request": [guard_request]}).collect(days=TRIAL_DAYS)
+    if result.errors and not result.notices:
+        raise ValueError(f"시험 수집 요청 실패: {'; '.join(result.errors[:3])}")
     return [n.title for n in result.notices]
 
 
@@ -320,7 +322,7 @@ async def _generate_validated(client, normalized: str, html: str) -> dict:
             except Exception as e:  # 잘못된 CSS 셀렉터 문법 등
                 reason = f"셀렉터를 HTML에 적용할 수 없음: {e}"
             else:
-                # 시험 수집은 bid-collectors가 요청하므로 guard_request를 안 거친다 — 요청할 URL을 먼저 확인
+                # 설정 URL은 먼저 확인(명시적 탈락 사유). 리다이렉트 등 실제 요청은 trial_collect의 훅이 막는다
                 for key in ("list_url", "session_init_url"):
                     if config.get(key):
                         await assert_safe_url(config[key])
