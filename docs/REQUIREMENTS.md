@@ -106,6 +106,8 @@
   - [x] 탈락하면 이유를 AI에게 알려 최대 3회까지 재생성하고, 모두 탈락하면 실패(`시험 수집 실패(3회 시도)`)
     → `test_retry_with_feedback_then_success` · `test_all_attempts_fail_raises` · `test_unparseable_reply_is_retried`
   - [x] AI 거부(refusal)는 재시도하지 않는다 → `test_refusal_is_not_retried`
+  - [ ] URL 추가는 owner·admin만 가능하다 — member가 추가하면 403 (2026-09-23 사용자 결정 — 새 URL마다 AI 비용 발생)
+- **회사당 URL 개수 상한**: 요금제 설계 때 정한다(2026-09-23 사용자 결정). 그 전까지 상한 없음.
 - **미구현(확인 필요)**: 스크래퍼로 수집한 공고(scraped_notices)는 공고 목록 API에 나오지 않는다 — 목록은 bid_notices만 조회.
   의도된 범위인지 미정 → '미결 질문'.
 - **상태**: 완료 (Redis 미설치로 AI 분석 디스패치는 실제로 돌지 않음 — F-013과 함께 해결)
