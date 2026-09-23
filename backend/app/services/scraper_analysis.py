@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.database import get_session_factory
 from app.models.scraper import ScraperRegistry
 from app.services import scraper_ai
+from app.services.scraper_collection import collect_scraper
 
 logger = logging.getLogger("bidwatch.scraper_analysis")
 
@@ -57,5 +58,7 @@ async def run_analysis(
 
     if error is None:
         logger.info(f"[analysis] 완료 scraper={scraper_id} {config.get('name')}")
+        # 바로 첫 수집 — 추가하자마자 공고가 쌓이게. 수집이 실패해도 분석 결과(ready)는 유지한다
+        await collect_scraper(scraper_id, factory)
         return "ready"
     return "failed"

@@ -119,5 +119,16 @@
   남은 것: ① 확인과 접속 사이 DNS 재바인딩 ② bid-collectors GenericScraper의 요청(시험·정기 수집)은 훅을 안 거쳐
   **리다이렉트로 내부망에 갈 수 있다** — bid-collectors에 요청 훅 주입 인자를 추가해야 막힘(양쪽 저장소 작업).
   Phase 011 전체 리뷰 전에 ②는 닫는다.
+- **DB 시각 9시간 오차 — 사용자 결정 대기 (2026-09-23 발견, 데이터 트랙)**: 실제 컬럼은 전부 timestamptz(001 마이그레이션
+  timezone=True — Phase 001 때 `downgrade base + upgrade head`로 재생성되며 바뀐 것으로 보임), 세션 TimeZone Asia/Seoul,
+  모델은 timezone 없는 DateTime. 그래서 `datetime.utcnow()`로 쓰는 `services/collection.py`의 bid_notices.updated_at·
+  scraped_notices.updated_at·system_sources.last_collected_at이 9시간 이르게 저장된다(화면의 '최근 수집' 날짜가 00~09시에 하루
+  이르게 보임). aware 값은 모델 캐스트(TIMESTAMP WITHOUT TIME ZONE) 때문에 저장 실패. 선택지: ① 쓰기를 `func.now()`로
+  (코드만, 새 코드는 이미 이렇게) ② 모델을 `DateTime(timezone=True)`로 맞추고 aware UTC로 쓰기(모델 변경 — 스키마 게이트)
+  ③ 연결 TimeZone을 UTC로(전역 — ::date 등 날짜 계산 결과가 바뀜). 기존 행 보정(+9h) 여부도 함께 결정. CLAUDE.md 규칙은
+  실측대로 정정함.
+- **URL 수집 제목의 게시판 배지 글자**: "핫이슈"·"새글" 등이 제목에 붙어 저장된다(실측 강원관광재단·광주정보문화산업진흥원).
+  키워드 매칭에는 해가 적지만 목록 표시·중복 판정(F-014)에 걸린다. AI 프롬프트에 배지 요소 제외 지시 또는 bid-collectors
+  제목 추출 개선으로 — 공백 정규화(`clean_title`)도 원래는 수집기(bid-collectors) 책임이라 그쪽으로 옮길 후보.
 - **분석 중 서버 재시작 시 status가 analyzing에 남음** — BackgroundTasks는 프로세스와 함께 사라진다. 지금은 같은 URL을
   다시 제출해도 재분석하지 않는다(failed만 재분석). 기동 시 오래된 analyzing을 pending/failed로 되돌리는 복구가 필요.

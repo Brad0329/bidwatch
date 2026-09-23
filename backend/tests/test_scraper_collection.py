@@ -1,0 +1,134 @@
+"""URL 출처 수집 → scraped_notices 저장 (실제 DB, 수집기·DNS는 가짜)."""
+
+import uuid
+from datetime import date, datetime, timezone
+from types import SimpleNamespace
+
+import pytest
+from bid_collectors import Notice
+from httpx import AsyncClient
+from sqlalchemy import func, select
+
+from app.database import get_session_factory
+from app.models.scraper import ScrapedNotice, ScraperRegistry
+from app.services import scraper_analysis, scraper_collection
+from app.services.url_guard import UnsafeUrlError
+
+CONFIG = {
+    "name": "예시기관", "source_key": "example", "list_url": "https://example.go.kr/board",
+    "list_selector": "tr", "title_selector": "td a", "date_selector": "td.d",
+}
+
+
+def _notice(i: int) -> Notice:
+    return Notice(source="예시기관", bid_no=f"SCR-example-{i}", title=f"시설물 유지보수 용역 입찰 공고 {i}",
+                  organization="예시기관", url=f"https://example.go.kr/v/{i}", start_date=date.today())
+
+
+@pytest.fixture
+def fake_scraper(monkeypatch):
+    state = {"notices": [_notice(1), _notice(2)], "raise": None, "calls": 0, "blocked": set()}
+
+    class FakeScraper:
+        def __init__(self, config):
+            self.config = config
+
+        async def collect(self, days=30):
+            state["calls"] += 1
+            if state["raise"]:
+                raise state["raise"]
+            return SimpleNamespace(notices=state["notices"], errors=[], is_partial=False)
+
+    async def fake_guard(url):
+        if any(b in url for b in state["blocked"]):
+            raise UnsafeUrlError("공인 IP가 아님")
+
+    async def fake_analyze(url):
+        return dict(CONFIG)
+
+    monkeypatch.setattr(scraper_collection, "GenericScraper", FakeScraper)
+    monkeypatch.setattr(scraper_collection, "assert_safe_url", fake_guard)
+    monkeypatch.setattr(scraper_analysis.scraper_ai, "analyze_url", fake_analyze)
+    return state
+
+
+async def _new_scraper(client: AsyncClient) -> int:
+    resp = await client.post("/api/auth/register", json={
+        "email": f"col-{uuid.uuid4().hex[:8]}@example.com", "password": "password123",
+        "name": "U", "company_name": "C"})
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    resp = await client.post("/api/sources", json={"url": f"https://c-{uuid.uuid4().hex[:6]}.com/b"},
+                             headers=headers)
+    return resp.json()["scraper_id"]
+
+
+async def _saved_count(scraper_id: int) -> int:
+    async with get_session_factory()() as db:
+        return await db.scalar(select(func.count()).select_from(ScrapedNotice)
+                               .where(ScrapedNotice.scraper_id == scraper_id))
+
+
+async def _row(scraper_id: int) -> ScraperRegistry:
+    async with get_session_factory()() as db:
+        return await db.get(ScraperRegistry, scraper_id)
+
+
+@pytest.mark.asyncio
+async def test_ready_analysis_collects_and_saves_immediately(client: AsyncClient, fake_scraper):
+    scraper_id = await _new_scraper(client)
+    assert await scraper_analysis.run_analysis(scraper_id) == "ready"
+    assert await _saved_count(scraper_id) == 2
+    row = await _row(scraper_id)
+    assert row.last_collected_count == 2
+    # 이 컬럼은 timestamptz(001 마이그레이션 timezone=True) — naive UTC로 써도 UTC 시각으로 저장돼야 한다
+    age = datetime.now(timezone.utc) - row.last_collected_at
+    assert abs(age.total_seconds()) < 120
+
+
+@pytest.mark.asyncio
+async def test_recollect_upserts_without_duplicates(client: AsyncClient, fake_scraper):
+    scraper_id = await _new_scraper(client)
+    await scraper_analysis.run_analysis(scraper_id)
+    fake_scraper["notices"] = [_notice(1), _notice(2), _notice(3)]  # 기존 2건 + 새 1건
+    result = await scraper_collection.collect_scraper(scraper_id)
+    assert result["status"] == "ok"
+    assert await _saved_count(scraper_id) == 3
+
+
+@pytest.mark.asyncio
+async def test_collect_failure_keeps_ready_and_is_reported(client: AsyncClient, fake_scraper):
+    scraper_id = await _new_scraper(client)
+    fake_scraper["raise"] = RuntimeError("사이트 응답 없음")
+    assert await scraper_analysis.run_analysis(scraper_id) == "ready"  # 분석 결과는 유지
+    row = await _row(scraper_id)
+    assert row.status == "ready" and row.last_collected_count is None
+    assert (await scraper_collection.collect_scraper(scraper_id))["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_unsafe_config_url_is_not_requested(client: AsyncClient, fake_scraper):
+    scraper_id = await _new_scraper(client)
+    await scraper_analysis.run_analysis(scraper_id)  # 첫 수집은 정상
+    assert fake_scraper["calls"] == 1
+    fake_scraper["blocked"].add("example.go.kr")  # 그 뒤 DNS가 내부망으로 바뀐 경우
+    result = await scraper_collection.collect_scraper(scraper_id)
+    assert result["status"] == "error"
+    assert fake_scraper["calls"] == 1  # 수집 요청이 나가지 않았다
+
+
+@pytest.mark.asyncio
+async def test_titles_are_saved_with_normal_spaces(client: AsyncClient, fake_scraper):
+    # 실측: 게시판 제목의 \xa0 때문에 키워드 '운영 대행'이 매칭되지 않았다
+    fake_scraper["notices"] = [_notice(1).model_copy(update={"title": "크루즈\xa0포럼\xa0운영\xa0대행용역  입찰"})]
+    scraper_id = await _new_scraper(client)
+    await scraper_analysis.run_analysis(scraper_id)
+    async with get_session_factory()() as db:
+        title = await db.scalar(select(ScrapedNotice.title).where(ScrapedNotice.scraper_id == scraper_id))
+    assert title == "크루즈 포럼 운영 대행용역 입찰"
+
+
+@pytest.mark.asyncio
+async def test_not_ready_scraper_is_skipped(client: AsyncClient, fake_scraper):
+    scraper_id = await _new_scraper(client)  # 분석 전(pending)
+    assert (await scraper_collection.collect_scraper(scraper_id))["status"] == "skipped"
+    assert fake_scraper["calls"] == 0

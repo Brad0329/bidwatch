@@ -27,8 +27,9 @@ FastAPI + PostgreSQL 백엔드, Next.js 프론트엔드로 만드는 구독형 �
   ② 규칙 추가. 점검은 Phase 종료 시 `/approval-audit`. 대가·목록 실물: `노하우_승인_대기_최소화.md`
 - **비밀정보(API 키, 접속정보)는 이 파일·커밋·채팅에 절대 쓰지 않는다.** `backend/.env`에 두고 gitignore한다.
 - **로컬 포트는 9000번대**: 프론트 9000 / 백엔드 9100 / 프로토타입 9456. 새 서비스도 9000번대에서 고른다.
-- **DB 타임스탬프는 timezone-naive UTC(`datetime.utcnow()`)** — 컬럼이 `TIMESTAMP WITHOUT TIME ZONE`이라
-  aware datetime은 저장이 실패한다(`work_log/Phase_001-003.md`).
+- **DB 시각은 `func.now()`로 DB가 찍게 한다** (2026-09-23 실측 정정): 실제 컬럼은 전부 `timestamptz`, 세션 TimeZone은
+  Asia/Seoul인데 모델은 timezone 없는 `DateTime`이다 → aware datetime은 저장 실패, naive `utcnow()`는 KST로 해석돼
+  **9시간 이르게** 저장된다. 기존 `utcnow()` 3곳의 처리는 plan.md 보류(사용자 결정 대기). 옛 근거: `Phase_001-003.md`.
 
 ## 데이터 모델/스키마 변경 게이트 ★스키마는 되돌리기 비싸다
 - 스키마 **결정의 기록 = `docs/SCHEMA.md`** (설계 의도, 관계, 제약, 변경 이력).

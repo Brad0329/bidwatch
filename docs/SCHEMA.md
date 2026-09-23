@@ -10,7 +10,10 @@
 
 ## 설계 원칙
 - PostgreSQL 16, SQLAlchemy 2.0 async 모델, Alembic 마이그레이션(번호형 `001_`, `002_` …).
-- **타임스탬프는 `TIMESTAMP WITHOUT TIME ZONE` + 앱에서 `datetime.utcnow()`(naive UTC)** — aware datetime은 저장 실패.
+- **타임스탬프 (2026-09-23 실측 정정)**: 실제 컬럼은 전부 `timestamptz`(001 마이그레이션 `timezone=True`), 세션 TimeZone
+  Asia/Seoul, 모델은 timezone 없는 `DateTime` — 이 어긋남 때문에 aware 값은 저장 실패, naive `utcnow()`는 9시간 이르게 저장된다.
+  결정 전까지 앱이 쓰는 시각은 `func.now()`. 정리 방향(모델 정렬 / 연결 TimeZone / 기존 행 보정)은 plan.md 보류 — 사용자 결정 대기.
+  (종전 기록 "TIMESTAMP WITHOUT TIME ZONE + utcnow()"는 Phase 001 시점 DB 기준이었다.)
 - 공고 식별: 출처 내 고유번호 `(source_id, bid_no)` / `(scraper_id, bid_no)` UNIQUE — 재수집은 갱신(upsert).
 - 수집기별 추가 필드는 컬럼을 늘리지 않고 `extra JSONB`에 둔다(출처마다 필드가 다름). 첨부는 `attachments JSONB`.
 - 다중 값 설정은 마이그레이션 회피를 위해 콤마 구분 문자열도 허용(예: `tenant_profiles.region = "서울,부산"`).

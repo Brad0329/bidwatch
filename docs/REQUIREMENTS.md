@@ -104,6 +104,9 @@
   - [x] 분석 결과가 상태로 남는다(ready + 설정 / failed + 이유, 예상 밖 오류도 failed) — Redis 없이 백그라운드 실행
     → `test_run_analysis_marks_ready_with_config` · `test_run_analysis_marks_failed_with_reason` ·
     `test_run_analysis_unexpected_error_is_recorded_not_raised`
+  - [x] 분석을 통과하면 곧바로 최근 30일 공고를 수집해 scraped_notices에 저장하고(재수집은 중복 없이 갱신),
+    수집이 실패해도 ready는 유지된다 → `test_scraper_collection.py`(6개 — 저장·중복 없음·실패 유지·내부망 URL 재확인·
+    미준비 건너뜀·제목 공백 정규화)
   - [x] 내부망 URL(localhost·사설 IP·메타데이터 주소·file:)은 400, 응답에 원인 없음
     → `test_unsafe_url_rejected_without_detail` · `test_url_guard.py`(리다이렉트로 내부망 가는 요청 차단 포함)
   - [x] 같은 URL을 두 번 추가해도 스크래퍼는 1개다 → `test_add_same_url_twice`
@@ -119,8 +122,8 @@
 - **회사당 URL 개수 상한**: 요금제 설계 때 정한다(2026-09-23 사용자 결정). 그 전까지 상한 없음.
 - **미구현(확인 필요)**: 스크래퍼로 수집한 공고(scraped_notices)는 공고 목록 API에 나오지 않는다 — 목록은 bid_notices만 조회.
   의도된 범위인지 미정 → '미결 질문'.
-- **상태**: 진행 — 서버 쪽 접수·구독·분석은 동작(2026-09-23 실사이트 E2E: 제출 → ready). 남은 것: 수집 결과 저장·
-  공고목록 노출(위 '미구현')·URL 추가 화면·SSRF 남은 위험(plan.md 보류)
+- **상태**: 진행 — 접수·구독·분석·첫 수집 저장 동작(2026-09-23 실사이트 E2E: 강원관광재단 제출 → ready → 30일 공고
+  6건 저장), URL 추가 화면 있음(사용자 실테스트 대기). 남은 것: 공고목록 노출(위 '미구현')·SSRF 남은 위험(plan.md 보류)
 
 ### F-010: 태그 + 검토요청 페이지
 - **설명**: 공고당 태그 1개(검토요청/입찰대상/제외/낙찰/유찰), 테넌트 공유, PUT upsert, 같은 태그 재클릭 시 삭제.
