@@ -53,6 +53,8 @@ def _classify_ai_error(msg: str) -> str:
         return "FAIL_FETCH"
     if msg.startswith("AI 분석 실패") or "거부" in msg or "max_tokens" in msg:
         return "FAIL_AI"
+    if msg.startswith("시험 수집 실패"):
+        return "FAIL_TRIAL"  # 재시도를 모두 써도 시험 수집을 통과하지 못함
     return "FAIL_AI_OUTPUT"  # JSON 파싱·필수 필드 누락
 
 

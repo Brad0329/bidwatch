@@ -5,9 +5,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.services import scraper_ai
 from app.services.scraper_ai import (
+    MAX_ATTEMPTS,
     MAX_HTML_CHARS,
     build_user_message,
+    diagnose_config,
+    judge_trial,
     normalize_pagination,
     parse_ai_response,
 )
@@ -98,6 +102,116 @@ def test_user_message_wraps_html_and_ends_with_instruction():
     msg = build_user_message(URL, "<table><tr><td>공고</td></tr></table>")
     assert "<html_document>\n<table>" in msg
     assert msg.rstrip().endswith("JSON 객체 하나만 출력하세요.")
+
+
+# ── 시험 수집 판정 ──
+
+BOARD_HTML = """<table><tbody>
+<tr><td>1</td><td><a href="/v/1">2026년 지역특화콘텐츠 개발지원 사업 공고</a></td><td>2026-09-20</td></tr>
+<tr><td>2</td><td><a href="/v/2">청사 시설물 유지보수 용역 입찰 공고</a></td><td>2026-09-18</td></tr>
+<tr><td>3</td><td><span>공지</span></td><td>2026-09-17</td></tr>
+<tr><td>4</td><td><span>공지</span></td><td>2026-09-15</td></tr>
+</tbody></table>"""
+LONG_TITLES = ["2026년 지역특화콘텐츠 개발지원 사업 공고", "청사 시설물 유지보수 용역 입찰 공고"]
+
+
+def test_diagnose_counts_rows_titles_and_dates():
+    diag = diagnose_config(dict(CONFIG, date_selector="td:nth-child(3)"), BOARD_HTML)
+    assert (diag["rows"], diag["titled"], diag["dated"], diag["titled_dated"]) == (4, 2, 4, 2)
+
+
+def test_judge_passes_good_trial():
+    diag = {"rows": 10, "titled": 10, "dated": 10, "titled_dated": 10, "sample_titles": []}
+    assert judge_trial(CONFIG, diag, LONG_TITLES) is None
+
+
+def test_judge_rejects_zero_notices():
+    assert "0건" in judge_trial(CONFIG, None, [])
+
+
+def test_judge_rejects_low_coverage():
+    # 실측 사례(충남테크노파크): 날짜 있는 30행 중 제목은 3행에서만
+    diag = {"rows": 30, "titled": 3, "dated": 30, "titled_dated": 3, "sample_titles": []}
+    assert "일부 행" in judge_trial(CONFIG, diag, LONG_TITLES)
+
+
+def test_judge_skips_coverage_for_post_configs():
+    diag = {"rows": 0, "titled": 0, "dated": 5, "titled_dated": 0, "sample_titles": []}
+    assert judge_trial(dict(CONFIG, post_data={}), diag, LONG_TITLES) is None
+
+
+def test_judge_rejects_label_like_titles():
+    # 실측 사례(전북경제통상진흥원 손 설정): 분류 라벨이 제목으로 잡힘
+    assert "라벨" in judge_trial(CONFIG, None, ["개찰결과", "입찰공고", "공지"])
+
+
+# ── 재시도 루프 (가짜 AI 클라이언트 + 가짜 수집) ──
+
+class _FakeMessages:
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.calls = []
+
+    async def create(self, **kwargs):
+        self.calls.append([dict(m) for m in kwargs["messages"]])
+        return self.replies.pop(0)
+
+
+@pytest.fixture
+def fake_env(monkeypatch):
+    def setup(replies, trial_titles):
+        msgs = _FakeMessages(replies)
+        monkeypatch.setattr(scraper_ai, "_make_client", lambda: SimpleNamespace(messages=msgs))
+
+        async def fake_fetch(url):
+            return BOARD_HTML + "x" * 100
+
+        async def fake_trial(config):
+            return trial_titles.pop(0)
+
+        monkeypatch.setattr(scraper_ai, "fetch_page_html", fake_fetch)
+        monkeypatch.setattr(scraper_ai, "trial_collect", fake_trial)
+        return msgs
+    return setup
+
+
+@pytest.mark.asyncio
+async def test_retry_with_feedback_then_success(fake_env):
+    bad = dict(CONFIG, title_selector="td:nth-child(9) a")
+    msgs = fake_env([_resp([_text(json.dumps(bad))]), _resp([_text(json.dumps(CONFIG))])],
+                    [[], LONG_TITLES])
+    config = await scraper_ai.analyze_url(URL)
+
+    assert config["title_selector"] == CONFIG["title_selector"]
+    assert len(msgs.calls) == 2
+    second = msgs.calls[1]
+    assert second[1]["role"] == "assistant"  # 앞 응답을 그대로 이어 붙임
+    assert "0건" in second[2]["content"]      # 실패 이유를 AI에게 알림
+
+
+@pytest.mark.asyncio
+async def test_all_attempts_fail_raises(fake_env):
+    msgs = fake_env([_resp([_text(json.dumps(CONFIG))]) for _ in range(MAX_ATTEMPTS)],
+                    [[] for _ in range(MAX_ATTEMPTS)])
+    with pytest.raises(ValueError, match=f"시험 수집 실패\\({MAX_ATTEMPTS}회"):
+        await scraper_ai.analyze_url(URL)
+    assert len(msgs.calls) == MAX_ATTEMPTS
+
+
+@pytest.mark.asyncio
+async def test_unparseable_reply_is_retried(fake_env):
+    msgs = fake_env([_resp([_text("<br>JSON:")]), _resp([_text(json.dumps(CONFIG))])],
+                    [LONG_TITLES])
+    await scraper_ai.analyze_url(URL)
+    assert "JSON" in msgs.calls[1][2]["content"]
+
+
+@pytest.mark.asyncio
+async def test_refusal_is_not_retried(fake_env):
+    msgs = fake_env([_resp([], stop_reason="refusal")], [])
+    with pytest.raises(ValueError, match="거부"):
+        await scraper_ai.analyze_url(URL)
+    assert len(msgs.calls) == 1
 
 
 def test_user_message_reports_truncation_with_total_length():

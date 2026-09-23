@@ -101,6 +101,11 @@
   - [x] 같은 URL을 두 번 추가해도 스크래퍼는 1개다 → `test_add_same_url_twice`
   - [x] 구독이 없으면 빈 목록 → `test_list_subscriptions_empty`
   - [ ] 미리보기 실패 시 응답에 예외 원문이 노출되지 않는다 → **현재 위반**(plan.md 보류 항목)
+  - [x] AI 설정은 시험 수집을 통과해야 반환된다 — 0건·제목 커버리지 50% 미만·제목 길이 중앙값 8자 미만이면 탈락
+    → `test_judge_rejects_zero_notices` · `test_judge_rejects_low_coverage` · `test_judge_rejects_label_like_titles`
+  - [x] 탈락하면 이유를 AI에게 알려 최대 3회까지 재생성하고, 모두 탈락하면 실패(`시험 수집 실패(3회 시도)`)
+    → `test_retry_with_feedback_then_success` · `test_all_attempts_fail_raises` · `test_unparseable_reply_is_retried`
+  - [x] AI 거부(refusal)는 재시도하지 않는다 → `test_refusal_is_not_retried`
 - **미구현(확인 필요)**: 스크래퍼로 수집한 공고(scraped_notices)는 공고 목록 API에 나오지 않는다 — 목록은 bid_notices만 조회.
   의도된 범위인지 미정 → '미결 질문'.
 - **상태**: 완료 (Redis 미설치로 AI 분석 디스패치는 실제로 돌지 않음 — F-013과 함께 해결)

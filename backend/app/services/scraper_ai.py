@@ -7,10 +7,14 @@ import hashlib
 import json
 import logging
 import re
+import statistics
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 import httpx
+from bid_collectors import GenericScraper
 from bid_collectors.generic_scraper import ScraperConfig
+from bid_collectors.utils.dates import parse_date
+from bs4 import BeautifulSoup
 from pydantic import ValidationError
 
 from app.config import settings
@@ -66,6 +70,12 @@ SCRAPER_ANALYSIS_PROMPT = """당신은 웹 게시판의 HTML 구조를 분석하
    설명·마크다운 코드블록 없이 JSON 객체 하나만 출력하세요."""
 
 MAX_HTML_CHARS = 150_000
+
+# 시험 수집 (2026-09-23 실측 근거: ctp는 30행 중 3행만 잡힘, 손 설정 jbba·sjtp는 "공지"·"개찰결과" 라벨을 제목으로 잡음)
+MAX_ATTEMPTS = 3
+TRIAL_DAYS = 365          # 게시가 뜸한 게시판이 기간 탓에 0건으로 탈락하지 않게
+MIN_TRIAL_COVERAGE = 0.5  # 날짜 있는 행 중 제목이 잡힌 행의 최소 비율
+MIN_TITLE_LEN = 8         # 제목 길이 중앙값 하한 — 이보다 짧으면 분류 라벨 의심
 
 
 def normalize_url(url: str) -> str:
@@ -184,20 +194,64 @@ def _extract_json_object(text: str) -> dict:
     raise ValueError(f"AI 응답을 JSON으로 파싱할 수 없습니다: {text[:200]}")
 
 
-async def analyze_url(url: str) -> dict:
-    """URL의 HTML을 Claude API로 분석하여 scraper_config를 생성.
+def diagnose_config(config: dict, html: str) -> dict:
+    """1페이지 HTML에 설정을 대 보고 행·제목·날짜가 몇 개 잡히는지 센다 (재시도 피드백용)."""
+    soup = BeautifulSoup(html, config.get("parser") or "html.parser")
+    scope = soup.select_one(config["grid_selector"]) if config.get("grid_selector") else soup
+    rows = scope.select(config["list_selector"]) if scope else []
+    titles, dated, titled_dated = [], 0, 0
+    for row in rows:
+        t_el = row.select_one(config["title_selector"])
+        d_el = row.select_one(config["date_selector"])
+        title = t_el.get_text(strip=True) if t_el else ""
+        has_date = bool(d_el and parse_date(d_el.get_text(strip=True)))
+        if title:
+            titles.append(title)
+        if has_date:
+            dated += 1
+            if title:
+                titled_dated += 1
+    return {"rows": len(rows), "titled": len(titles), "dated": dated,
+            "titled_dated": titled_dated, "sample_titles": titles[:5]}
 
-    Returns:
-        scraper_config dict
+
+def judge_trial(config: dict, diag: dict | None, titles: list[str]) -> str | None:
+    """시험 수집 결과 판정. 통과면 None, 아니면 AI에게 돌려줄 실패 이유."""
+    if not titles:
+        return f"수집 0건 (1페이지 진단: {diag})"
+    # POST 설정은 받은 HTML과 수집기가 보는 응답이 달라 1페이지 진단을 쓰지 않는다
+    if diag and config.get("post_data") is None and diag["dated"]:
+        coverage = diag["titled_dated"] / diag["dated"]
+        if coverage < MIN_TRIAL_COVERAGE:
+            return (f"날짜가 있는 {diag['dated']}행 중 제목이 잡힌 행이 {diag['titled_dated']}행뿐"
+                    f" — title_selector가 일부 행에만 맞음")
+    median_len = statistics.median(len(t) for t in titles)
+    if median_len < MIN_TITLE_LEN:
+        return f"제목이 너무 짧음(중앙값 {median_len}자) — 분류 라벨을 제목으로 잡은 것으로 의심: {titles[:5]}"
+    return None
+
+
+async def trial_collect(config: dict) -> list[str]:
+    """설정으로 실제 수집해 본 제목 목록."""
+    result = await GenericScraper(config).collect(days=TRIAL_DAYS)
+    return [n.title for n in result.notices]
+
+
+def _make_client():
+    import anthropic
+    return anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+
+async def analyze_url(url: str) -> dict:
+    """URL → AI 설정 생성 → 시험 수집 → 실패하면 이유를 알려 재생성 (최대 MAX_ATTEMPTS회).
+
+    시험 수집을 통과한 설정만 돌려준다 — 틀린 설정이 ready로 저장되지 않게.
 
     Raises:
-        ValueError: HTML을 가져올 수 없거나 AI 분석 실패
+        ValueError: HTML을 가져올 수 없거나, AI 호출 실패, 또는 모든 시도가 시험 수집에서 탈락
     """
-    import anthropic
-
     normalized = normalize_url(url)
 
-    # 1. HTML 가져오기
     try:
         html = await fetch_page_html(normalized)
     except Exception as e:
@@ -206,21 +260,56 @@ async def analyze_url(url: str) -> dict:
     if len(html.strip()) < 100:
         raise ValueError("페이지 내용이 너무 짧습니다")
 
-    # 2. Claude API 호출
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    client = _make_client()
+    # HTML이 든 첫 메시지를 캐시해 재시도 때 입력 비용을 줄인다
+    messages = [{"role": "user", "content": [{
+        "type": "text", "text": build_user_message(normalized, html),
+        "cache_control": {"type": "ephemeral"},
+    }]}]
+    reason = ""
 
-    try:
-        response = client.messages.create(
-            model=settings.SCRAPER_AI_MODEL,
-            # Opus 5는 thinking이 기본으로 켜지고 그 토큰도 max_tokens에 포함된다 — 작으면 JSON이 잘린다
-            max_tokens=16000,
-            system=SCRAPER_ANALYSIS_PROMPT,
-            messages=[{"role": "user", "content": build_user_message(normalized, html)}],
-        )
-    except Exception as e:
-        raise ValueError(f"AI 분석 실패: {e}") from e
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            response = await client.messages.create(
+                model=settings.SCRAPER_AI_MODEL,
+                # Opus 5는 thinking이 기본으로 켜지고 그 토큰도 max_tokens에 포함된다 — 작으면 JSON이 잘린다
+                max_tokens=16000,
+                system=SCRAPER_ANALYSIS_PROMPT,
+                messages=messages,
+            )
+        except Exception as e:
+            raise ValueError(f"AI 분석 실패: {e}") from e
 
-    return parse_ai_response(response, normalized)
+        if response.stop_reason == "refusal":
+            # 재시도해도 같은 결과라 바로 올린다
+            raise ValueError("AI가 이 페이지 분석을 거부했습니다 (stop_reason=refusal)")
+
+        reason, titles = "", []
+        try:
+            config = parse_ai_response(response, normalized)
+            try:
+                diag = diagnose_config(config, html)
+            except Exception as e:  # 잘못된 CSS 셀렉터 문법 등
+                reason = f"셀렉터를 HTML에 적용할 수 없음: {e}"
+            else:
+                titles = await trial_collect(config)
+                reason = judge_trial(config, diag, titles) or ""
+        except Exception as e:
+            reason = f"{type(e).__name__}: {e}"
+
+        if not reason:
+            logger.info(f"[scraper_ai] 시험 수집 통과: {normalized} (시도 {attempt}회, {len(titles)}건)")
+            return config
+
+        logger.warning(f"[scraper_ai] 시험 수집 탈락 {attempt}/{MAX_ATTEMPTS}: {normalized} — {reason}")
+        # 응답을 그대로 이어 붙인다(thinking 블록 포함, 편집하지 않음)
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({"role": "user", "content": (
+            f"이 설정으로 시험 수집한 결과 문제가 있습니다: {reason}\n"
+            "위 <html_document>를 다시 보고 고친 scraper_config JSON 객체 하나만 출력하세요."
+        )})
+
+    raise ValueError(f"시험 수집 실패({MAX_ATTEMPTS}회 시도): {reason}")
 
 
 def parse_ai_response(response, normalized: str) -> dict:
