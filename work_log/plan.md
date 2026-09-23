@@ -83,5 +83,14 @@
   개발 DB에 행을 쌓는다. 분리하려면 테스트 전용 DB + alembic upgrade 픽스처(일반 트랙 — 사용자 확인 필요).
 - **수용 기준의 테스트 미대응** — F-004~F-008·F-010·F-011 필터 부분은 백엔드 테스트가 없다(`docs/REQUIREMENTS.md`에
   항목별 표시). 해당 기능을 다음에 건드릴 때 그 기능의 테스트부터 붙인다.
+- **AI 스크래퍼 성공률 1차 실측 (2026-09-23, claude-opus-5, `backend/scripts/measure_ai_scraper.py`)** —
+  lets_portal 손 설정 39곳을 정답으로 비교. 기준선(손 설정) 1건 이상인 **29곳 중 성공 13곳(45%)**.
+  실패 16곳 원인: ① AI 응답이 JSON이 아님 8곳(HTML 이어쓰기·"Assistant{" 등 — 50K에서 잘린 HTML 뒤에
+  지시 없이 끝나는 프롬프트 구조 문제, 그중 2곳은 뒤에 유효 JSON이 있었음) ② 셀렉터 0건 3곳(gbsa·kocca·koipa)
+  ③ 겹침 낮음 3곳(gnto·jbba·dips) ④ POST 전용 사이트 2곳(itp·gntp — GET 분석으로는 구조적으로 불가).
+  기준선 0건 10곳 중 3곳(ijto·kised·touraz)은 AI가 공고를 찾음 = 손 설정이 사이트 개편으로 낡음.
+  부수 발견: AI가 pagination을 전체 URL이나 `?`로 시작하는 쿼리로 내서 2페이지부터 URL이 이중으로 붙음 /
+  같은 사이트도 실행마다 설정이 달라짐(gwto 14건→7건) / bid-collectors `create_client`가 커스텀 transport를
+  써서 `verify_ssl=False`가 무시됨(dicia·jica 기준선 0건의 원인).
 - **SSRF 점검** — F-009는 사용자가 준 URL을 서버가 가져온다. 내부망 주소(localhost·사설 IP·메타데이터 주소) 차단 여부
   미확인. 늦어도 Phase 011 전체 리뷰에서, 가능하면 F-009를 다음에 건드릴 때 보안 ② 범위 점검.
