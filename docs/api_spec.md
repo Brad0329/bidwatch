@@ -63,7 +63,7 @@ POST   /api/sources/system/{id}/subscribe       시스템 출처 구독
 DELETE /api/sources/system/{id}/unsubscribe     시스템 출처 구독 해제
 
 GET    /api/sources                             내 커스텀 스크래퍼 구독 목록
-POST   /api/sources                             URL 추가 → AI 분석 디스패치
+POST   /api/sources                             URL 추가(owner·admin) → 즉시 구독 + AI 분석 백그라운드 실행 (내부망 URL 400)
 GET    /api/sources/{sub_id}                    구독 상세 (스크래퍼 상태 폴링)
 GET    /api/sources/{sub_id}/preview            스크래퍼 테스트 수집 미리보기
 POST   /api/sources/{sub_id}/confirm            미리보기 확인 후 구독 확정

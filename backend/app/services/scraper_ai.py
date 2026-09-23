@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from pydantic import ValidationError
 
 from app.config import settings
+from app.services.url_guard import assert_safe_url, guard_request
 
 logger = logging.getLogger("bidwatch.scraper_ai")
 
@@ -120,6 +121,7 @@ async def fetch_page_html(url: str, timeout: int = 15) -> str:
         timeout=timeout,
         follow_redirects=True,
         headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+        event_hooks={"request": [guard_request]},  # 사용자 URL — 리다이렉트까지 SSRF 확인
     ) as client:
         resp = await client.get(url)
         resp.raise_for_status()
@@ -318,6 +320,10 @@ async def _generate_validated(client, normalized: str, html: str) -> dict:
             except Exception as e:  # 잘못된 CSS 셀렉터 문법 등
                 reason = f"셀렉터를 HTML에 적용할 수 없음: {e}"
             else:
+                # 시험 수집은 bid-collectors가 요청하므로 guard_request를 안 거친다 — 요청할 URL을 먼저 확인
+                for key in ("list_url", "session_init_url"):
+                    if config.get(key):
+                        await assert_safe_url(config[key])
                 titles = await trial_collect(config)
                 reason = judge_trial(config, diag, titles) or ""
         except Exception as e:

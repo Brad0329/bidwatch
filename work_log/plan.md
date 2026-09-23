@@ -15,6 +15,7 @@
 - 프론트: Next.js 16(App Router) · TypeScript · Tailwind · Zustand(인증) · TanStack Query(서버 상태)
 - 수집: `bid-collectors` 패키지(별도 저장소 `C:\Users\user\Documents\bid-collectors`, editable 설치) —
   인터페이스는 `docs/interface.md`. 현재 관리자 수동·동기 수집(Redis 미설치, Celery 코드는 있으나 미사용).
+  URL 출처 AI 분석은 접수 시 FastAPI BackgroundTasks로 즉시 실행(2026-09-23).
 - AI: Claude API — URL → scraper_config JSON 생성(F-009)
 - 상세: `docs/system_design.md`(구조·데이터 분리) · `docs/api_spec.md`(엔드포인트) · `docs/SCHEMA.md`(스키마 결정)
 
@@ -109,5 +110,10 @@
 - **승인 규칙 효과 확인 (2026-09-23 `/approval-audit`, `a3a7131`)** — ruff·git 읽기·git push·bid-collectors 교차
   작업을 settings.local.json에 열었다. 다음 세션에서 `python scripts/measure_wait.py --grep ruff`(·`git -C`)로
   8초 초과가 사라졌는지 확인하고 이 줄을 지운다.
-- **SSRF 점검** — F-009는 사용자가 준 URL을 서버가 가져온다. 내부망 주소(localhost·사설 IP·메타데이터 주소) 차단 여부
-  미확인. 늦어도 Phase 011 전체 리뷰에서, 가능하면 F-009를 다음에 건드릴 때 보안 ② 범위 점검.
+- **SSRF 남은 위험** (2026-09-23 접수·구독 작업에서 기본 방어 적용 — `services/url_guard.py`: 접수 시 형식 검사 +
+  분석용 페이지 요청은 리다이렉트까지 매 요청 공인 IP 확인 + AI 설정의 list_url·session_init_url 사전 확인).
+  남은 것: ① 확인과 접속 사이 DNS 재바인딩 ② bid-collectors GenericScraper의 요청(시험·정기 수집)은 훅을 안 거쳐
+  **리다이렉트로 내부망에 갈 수 있다** — bid-collectors에 요청 훅 주입 인자를 추가해야 막힘(양쪽 저장소 작업).
+  Phase 011 전체 리뷰 전에 ②는 닫는다.
+- **분석 중 서버 재시작 시 status가 analyzing에 남음** — BackgroundTasks는 프로세스와 함께 사라진다. 지금은 같은 URL을
+  다시 제출해도 재분석하지 않는다(failed만 재분석). 기동 시 오래된 analyzing을 pending/failed로 되돌리는 복구가 필요.

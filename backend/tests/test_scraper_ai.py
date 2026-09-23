@@ -208,8 +208,12 @@ def fake_env(monkeypatch):
         async def fake_trial(config):
             return trial_titles.pop(0)
 
+        async def fake_guard(url):  # URL 방어는 test_url_guard.py에서 따로 — 여기선 DNS를 타지 않게
+            return None
+
         monkeypatch.setattr(scraper_ai, "fetch_page_html", fake_fetch)
         monkeypatch.setattr(scraper_ai, "trial_collect", fake_trial)
+        monkeypatch.setattr(scraper_ai, "assert_safe_url", fake_guard)
         return msgs
     return setup
 
@@ -244,6 +248,24 @@ async def test_unparseable_reply_is_retried(fake_env):
                     [LONG_TITLES])
     await scraper_ai.analyze_url(URL)
     assert "JSON" in msgs.calls[1][2]["content"]
+
+
+@pytest.mark.asyncio
+async def test_internal_session_init_url_from_ai_is_rejected(fake_env, monkeypatch):
+    # AI가 페이지 내용을 보고 만든 session_init_url도 서버가 요청한다 — 내부 주소면 탈락시키고 재생성
+    from app.services.url_guard import UnsafeUrlError
+
+    bad = dict(CONFIG, session_init_url="http://10.0.0.1/admin")
+    msgs = fake_env([_resp([_text(json.dumps(bad))]), _resp([_text(json.dumps(CONFIG))])], [LONG_TITLES])
+
+    async def guard(url):
+        if "10.0.0.1" in url:
+            raise UnsafeUrlError("공인 IP가 아님")
+
+    monkeypatch.setattr(scraper_ai, "assert_safe_url", guard)
+    config = await scraper_ai.analyze_url(URL)
+    assert "session_init_url" not in config
+    assert "UnsafeUrlError" in msgs.calls[1][2]["content"]
 
 
 @pytest.mark.asyncio

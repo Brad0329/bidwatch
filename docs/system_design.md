@@ -124,10 +124,12 @@
 - 향후: Celery Beat 정기 수집
 
 ### AI 스크래퍼 (커스텀 URL)
-1. 사용자 URL 제출 → URL 정규화 + 해시
-2. scraper_registry에서 동일 URL 검색
-3. 없으면 AI 분석 디스패치 (Claude API → scraper_config JSON 생성)
-4. 분석 완료 후 미리보기 → 구독 확정
+1. owner·admin이 URL 제출 → URL 정규화 + 해시 + SSRF 형식 검사(`services/url_guard.py`)
+2. scraper_registry에서 동일 URL 검색 (같은 URL은 스크래퍼 1개 공유)
+3. 제출한 회사를 **즉시 구독** (분석 결과와 무관)
+4. 새 URL·실패했던 URL이면 AI 분석을 **FastAPI BackgroundTasks**로 실행(`services/scraper_analysis.py`)
+   — Claude가 설정 생성 → 시험 수집으로 검증 → 탈락 시 이유를 알려 재생성(최대 3회) → ready/failed
+5. 페이지 요청은 리다이렉트까지 매 요청 공인 IP 확인(httpx request 훅)
 
 ---
 

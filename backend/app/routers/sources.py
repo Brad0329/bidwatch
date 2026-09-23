@@ -1,11 +1,11 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.deps import get_current_tenant, get_current_user
+from app.deps import get_current_tenant, get_current_user, require_admin
 from app.models.notice import SystemSource
 from app.models.scraper import ScraperRegistry, TenantSourceSubscription
 from app.models.subscription import TenantSystemSubscription
@@ -19,24 +19,21 @@ from app.schemas.source import (
     SystemSourceResponse,
 )
 from app.services.scraper_ai import hash_url, normalize_url
+from app.services.scraper_analysis import run_analysis
 from app.services.source import find_or_create_scraper, subscribe, unsubscribe
+from app.services.url_guard import UnsafeUrlError, check_url_syntax
 
 logger = logging.getLogger("bidwatch.sources")
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 
 
-def _dispatch_analysis(scraper_id: int):
-    """Celery 태스크 디스패치. Redis가 없으면 로그만 남기고 무시."""
-    try:
-        from app.tasks.celery_app import celery
-        celery.send_task(
-            "app.tasks.analyze_url.analyze_url_task",
-            args=[scraper_id],
-            ignore_result=True,
-        )
-    except Exception as e:
-        logger.warning(f"Celery dispatch failed (scraper_id={scraper_id}): {e}")
+def _dispatch_analysis(background_tasks: BackgroundTasks, scraper_id: int):
+    """AI 분석을 응답 뒤 백그라운드로 실행한다 (Redis·Celery 없이).
+
+    서버가 분석 도중 재시작되면 status가 analyzing에 남는다 — 복구 경로는 plan.md 보류 항목.
+    """
+    background_tasks.add_task(run_analysis, scraper_id)
 
 
 @router.get("/system", response_model=list[SystemSourceResponse])
@@ -147,52 +144,46 @@ async def list_subscriptions(
 @router.post("", response_model=SourceAddResponse)
 async def add_source(
     req: SourceAddRequest,
-    tenant: Tenant = Depends(get_current_tenant),
+    background_tasks: BackgroundTasks,
+    user: User = Depends(require_admin),  # 새 URL마다 AI 비용 — owner·admin만 (2026-09-23 결정)
     db: AsyncSession = Depends(get_db),
 ):
-    """URL 제출 → 스크래퍼 확인/생성 → AI 분석 디스패치."""
+    """URL 제출 → 스크래퍼 확인/생성 → 즉시 구독 → (새 URL·실패 URL이면) AI 분석 백그라운드 실행."""
     normalized = normalize_url(req.url)
-    url_hash_val = hash_url(normalized)
+    try:
+        check_url_syntax(normalized)
+    except UnsafeUrlError as e:
+        logger.warning(f"[sources] 거부한 URL (tenant={user.tenant_id}): {normalized} — {e}")
+        raise HTTPException(status_code=400, detail="사용할 수 없는 URL입니다")
 
     scraper, is_new = await find_or_create_scraper(
         url=normalized,
-        url_hash=url_hash_val,
-        tenant_id=tenant.id,
+        url_hash=hash_url(normalized),
+        tenant_id=user.tenant_id,
         db=db,
     )
+    # 분석 결과와 무관하게 제출한 회사를 바로 구독시킨다 — 분석이 끝나면 곧바로 이 회사 목록에 이어진다
+    sub = await subscribe(user.tenant_id, scraper.id, db)
 
-    subscription_id = None
-    message = ""
-
-    if scraper.status == "ready":
-        # 이미 분석 완료된 스크래퍼 → 즉시 구독
-        sub = await subscribe(tenant.id, scraper.id, db)
-        await db.commit()
-        subscription_id = sub.id
-        message = f"기존 스크래퍼 '{scraper.name}'에 구독되었습니다. 미리보기를 확인하세요."
-
-    elif scraper.status == "analyzing":
-        await db.commit()
-        message = "현재 AI 분석 진행 중입니다. 잠시 후 다시 확인하세요."
-
-    elif scraper.status == "failed" and not is_new:
-        # 실패한 스크래퍼 재분석
+    retry = scraper.status == "failed" and not is_new
+    if retry:
         scraper.status = "pending"
-        await db.commit()
-        _dispatch_analysis(scraper.id)
-        message = "이전 분석이 실패했습니다. 재분석을 시작합니다."
+    await db.commit()
 
-    else:
-        # 새 스크래퍼 → AI 분석 시작
-        await db.commit()
-        _dispatch_analysis(scraper.id)
-        message = "AI 분석을 시작합니다. 잠시 후 상태를 확인하세요."
+    if is_new or retry:
+        _dispatch_analysis(background_tasks, scraper.id)
 
+    messages = {
+        "ready": f"'{scraper.name}' 사이트가 구독되었습니다.",
+        "analyzing": "AI 분석이 진행 중입니다. 잠시 후 상태를 확인하세요.",
+        "pending": ("이전 분석이 실패해 재분석을 시작합니다." if retry
+                    else "AI 분석을 시작합니다. 잠시 후 상태를 확인하세요."),
+    }
     return SourceAddResponse(
         scraper_id=scraper.id,
-        subscription_id=subscription_id,
+        subscription_id=sub.id,
         scraper_status=scraper.status,
-        message=message,
+        message=messages.get(scraper.status, "구독되었습니다."),
     )
 
 

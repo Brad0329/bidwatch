@@ -94,10 +94,18 @@
 - **상태**: 완료
 
 ### F-009: AI 스크래퍼 — URL 추가·분석·미리보기·구독
-- **설명**: 사용자가 URL을 추가하면 정규화·해시 후 기존 스크래퍼를 재사용하거나 Claude API 분석을 디스패치한다.
-  분석 완료 후 미리보기 → 확정하면 구독. 해제는 soft delete.
+- **설명**: owner·admin이 URL을 추가하면 정규화·해시 후 기존 스크래퍼를 재사용하고, 제출한 회사를 즉시 구독시킨다.
+  새 URL이면 Claude 분석(시험 수집 검증 포함)을 백그라운드로 실행해 ready/failed로 만든다. 해제는 soft delete.
 - **수용 기준**:
-  - [x] URL을 추가하면 scraper_registry 행과 구독이 생긴다 → `test_add_source_creates_scraper`
+  - [x] URL을 추가하면 scraper_registry 행이 생긴다 → `test_add_source_creates_scraper`
+  - [x] 새 URL도 제출 즉시 제출한 회사의 구독 목록에 pending으로 나온다 → `test_new_url_is_subscribed_immediately`
+  - [x] AI 분석은 새 URL당 1번만 실행되고, 같은 URL을 다른 회사가 추가하면 구독만 생긴다
+    → `test_analysis_dispatched_once_per_new_url`
+  - [x] 분석 결과가 상태로 남는다(ready + 설정 / failed + 이유, 예상 밖 오류도 failed) — Redis 없이 백그라운드 실행
+    → `test_run_analysis_marks_ready_with_config` · `test_run_analysis_marks_failed_with_reason` ·
+    `test_run_analysis_unexpected_error_is_recorded_not_raised`
+  - [x] 내부망 URL(localhost·사설 IP·메타데이터 주소·file:)은 400, 응답에 원인 없음
+    → `test_unsafe_url_rejected_without_detail` · `test_url_guard.py`(리다이렉트로 내부망 가는 요청 차단 포함)
   - [x] 같은 URL을 두 번 추가해도 스크래퍼는 1개다 → `test_add_same_url_twice`
   - [x] 구독이 없으면 빈 목록 → `test_list_subscriptions_empty`
   - [ ] 미리보기 실패 시 응답에 예외 원문이 노출되지 않는다 → **현재 위반**(plan.md 보류 항목)
@@ -106,11 +114,13 @@
   - [x] 탈락하면 이유를 AI에게 알려 최대 3회까지 재생성하고, 모두 탈락하면 실패(`시험 수집 실패(3회 시도)`)
     → `test_retry_with_feedback_then_success` · `test_all_attempts_fail_raises` · `test_unparseable_reply_is_retried`
   - [x] AI 거부(refusal)는 재시도하지 않는다 → `test_refusal_is_not_retried`
-  - [ ] URL 추가는 owner·admin만 가능하다 — member가 추가하면 403 (2026-09-23 사용자 결정 — 새 URL마다 AI 비용 발생)
+  - [x] URL 추가는 owner·admin만 가능하다 — member가 추가하면 403 (2026-09-23 사용자 결정 — 새 URL마다 AI 비용 발생)
+    → `test_member_cannot_add_url`
 - **회사당 URL 개수 상한**: 요금제 설계 때 정한다(2026-09-23 사용자 결정). 그 전까지 상한 없음.
 - **미구현(확인 필요)**: 스크래퍼로 수집한 공고(scraped_notices)는 공고 목록 API에 나오지 않는다 — 목록은 bid_notices만 조회.
   의도된 범위인지 미정 → '미결 질문'.
-- **상태**: 완료 (Redis 미설치로 AI 분석 디스패치는 실제로 돌지 않음 — F-013과 함께 해결)
+- **상태**: 진행 — 서버 쪽 접수·구독·분석은 동작(2026-09-23 실사이트 E2E: 제출 → ready). 남은 것: 수집 결과 저장·
+  공고목록 노출(위 '미구현')·URL 추가 화면·SSRF 남은 위험(plan.md 보류)
 
 ### F-010: 태그 + 검토요청 페이지
 - **설명**: 공고당 태그 1개(검토요청/입찰대상/제외/낙찰/유찰), 테넌트 공유, PUT upsert, 같은 태그 재클릭 시 삭제.
