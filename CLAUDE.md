@@ -29,7 +29,7 @@ FastAPI + PostgreSQL 백엔드, Next.js 프론트엔드로 만드는 구독형 �
 - **로컬 포트는 9000번대**: 프론트 9000 / 백엔드 9100 / 프로토타입 9456. 새 서비스도 9000번대에서 고른다.
 - **DB 시각은 `func.now()`로 DB가 찍게 한다** (2026-09-23 실측 정정): 실제 컬럼은 전부 `timestamptz`, 세션 TimeZone은
   Asia/Seoul인데 모델은 timezone 없는 `DateTime`이다 → aware datetime은 저장 실패, naive `utcnow()`는 KST로 해석돼
-  **9시간 이르게** 저장된다. 기존 `utcnow()` 3곳의 처리는 plan.md 보류(사용자 결정 대기). 옛 근거: `Phase_001-003.md`.
+  **9시간 이르게** 저장된다(2026-09-23 기존 3곳도 `func.now()`로 교체, 기존 행 보정은 안 함 — 사용자 결정). `SCHEMA.md`.
 
 ## 데이터 모델/스키마 변경 게이트 ★스키마는 되돌리기 비싸다
 - 스키마 **결정의 기록 = `docs/SCHEMA.md`** (설계 의도, 관계, 제약, 변경 이력).

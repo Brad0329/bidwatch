@@ -1,9 +1,8 @@
 """수집 결과를 DB에 저장하는 서비스."""
 
 import logging
-from datetime import datetime, timezone
 
-from sqlalchemy import select, text
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,11 +65,11 @@ async def upsert_bid_notices(
                 "category": stmt.excluded.category,
                 "attachments": stmt.excluded.attachments,
                 "extra": stmt.excluded.extra,
-                "updated_at": datetime.utcnow(),
+                "updated_at": func.now(),  # DB가 찍는다 — utcnow()는 9시간 이르게 저장됐다(SCHEMA.md)
             },
         )
 
-        result = await db.execute(stmt)
+        await db.execute(stmt)
         # rowcount == 1 for both insert and update with ON CONFLICT
         # Check if it was an insert by checking xmax
         new_count += 1  # simplified — count all as processed
@@ -124,7 +123,7 @@ async def upsert_scraped_notices(
                 "region": stmt.excluded.region,
                 "attachments": stmt.excluded.attachments,
                 "extra": stmt.excluded.extra,
-                "updated_at": datetime.utcnow(),
+                "updated_at": func.now(),
             },
         )
         await db.execute(stmt)
@@ -142,6 +141,6 @@ async def update_source_stats(
     """system_sources의 수집 통계를 업데이트."""
     source = await db.get(SystemSource, source_id)
     if source:
-        source.last_collected_at = datetime.utcnow()
+        source.last_collected_at = func.now()
         source.last_collected_count = count
         await db.commit()

@@ -93,6 +93,25 @@ async def test_recollect_upserts_without_duplicates(client: AsyncClient, fake_sc
     result = await scraper_collection.collect_scraper(scraper_id)
     assert result["status"] == "ok"
     assert await _saved_count(scraper_id) == 3
+    # 갱신된 행의 updated_at이 실제 현재 시각(UTC)이어야 한다 — utcnow()는 9시간 이르게 저장됐다
+    async with get_session_factory()() as db:
+        updated = await db.scalar(select(ScrapedNotice.updated_at).where(
+            ScrapedNotice.scraper_id == scraper_id, ScrapedNotice.bid_no == "SCR-example-1"))
+    assert abs((datetime.now(timezone.utc) - updated).total_seconds()) < 120
+
+
+@pytest.mark.asyncio
+async def test_system_source_stats_time_is_correct(client: AsyncClient):
+    from app.models.notice import SystemSource
+    from app.services.collection import update_source_stats
+
+    async with get_session_factory()() as db:
+        source_id = await db.scalar(select(SystemSource.id).limit(1))
+        await update_source_stats(source_id, 7, db)
+    async with get_session_factory()() as db:
+        source = await db.get(SystemSource, source_id)
+    assert source.last_collected_count == 7
+    assert abs((datetime.now(timezone.utc) - source.last_collected_at).total_seconds()) < 120
 
 
 @pytest.mark.asyncio

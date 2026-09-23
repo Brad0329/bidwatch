@@ -12,7 +12,9 @@
 - PostgreSQL 16, SQLAlchemy 2.0 async 모델, Alembic 마이그레이션(번호형 `001_`, `002_` …).
 - **타임스탬프 (2026-09-23 실측 정정)**: 실제 컬럼은 전부 `timestamptz`(001 마이그레이션 `timezone=True`), 세션 TimeZone
   Asia/Seoul, 모델은 timezone 없는 `DateTime` — 이 어긋남 때문에 aware 값은 저장 실패, naive `utcnow()`는 9시간 이르게 저장된다.
-  결정 전까지 앱이 쓰는 시각은 `func.now()`. 정리 방향(모델 정렬 / 연결 TimeZone / 기존 행 보정)은 plan.md 보류 — 사용자 결정 대기.
+  **결정(2026-09-23 사용자)**: 앱이 쓰는 시각은 `func.now()`(DB가 찍는다) — 코드만 바꾸고 모델·연결 TimeZone은 그대로.
+  그 전에 utcnow()로 저장된 행(updated_at·system_sources.last_collected_at)은 보정하지 않는다(공개 전 개발 DB, 재수집 시 갱신).
+  버린 대안: 모델을 `DateTime(timezone=True)`로 정렬(스키마 게이트·범위 큼) / 연결 TimeZone UTC(전역, ::date 계산이 바뀜).
   (종전 기록 "TIMESTAMP WITHOUT TIME ZONE + utcnow()"는 Phase 001 시점 DB 기준이었다.)
 - 공고 식별: 출처 내 고유번호 `(source_id, bid_no)` / `(scraper_id, bid_no)` UNIQUE — 재수집은 갱신(upsert).
 - 수집기별 추가 필드는 컬럼을 늘리지 않고 `extra JSONB`에 둔다(출처마다 필드가 다름). 첨부는 `attachments JSONB`.
