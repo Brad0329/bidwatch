@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Claude AI
     ANTHROPIC_API_KEY: str = ""
+    SCRAPER_AI_MODEL: str = "claude-opus-5"
 
     # Toss Payments
     TOSS_SECRET_KEY: str = ""

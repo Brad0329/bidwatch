@@ -137,8 +137,9 @@ async def analyze_url(url: str) -> dict:
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2000,
+            model=settings.SCRAPER_AI_MODEL,
+            # Opus 5는 thinking이 기본으로 켜지고 그 토큰도 max_tokens에 포함된다 — 작으면 JSON이 잘린다
+            max_tokens=16000,
             system=SCRAPER_ANALYSIS_PROMPT,
             messages=[{
                 "role": "user",
@@ -148,8 +149,20 @@ async def analyze_url(url: str) -> dict:
     except Exception as e:
         raise ValueError(f"AI 분석 실패: {e}") from e
 
-    # 3. JSON 파싱
-    raw_text = response.content[0].text.strip()
+    return parse_ai_response(response, normalized)
+
+
+def parse_ai_response(response, normalized: str) -> dict:
+    """Claude 응답 → scraper_config dict. 거부·잘림·형식 오류는 ValueError."""
+    if response.stop_reason == "refusal":
+        raise ValueError("AI가 이 페이지 분석을 거부했습니다 (stop_reason=refusal)")
+    if response.stop_reason == "max_tokens":
+        raise ValueError("AI 응답이 max_tokens에서 잘렸습니다")
+
+    # thinking 블록이 text 블록 앞에 올 수 있으므로 text 블록만 모은다
+    raw_text = "".join(b.text for b in response.content if b.type == "text").strip()
+    if not raw_text:
+        raise ValueError(f"AI 응답에 텍스트가 없습니다 (stop_reason={response.stop_reason})")
 
     # 마크다운 코드블록이 있으면 제거
     if raw_text.startswith("```"):
