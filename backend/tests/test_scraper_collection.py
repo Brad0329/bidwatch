@@ -169,6 +169,36 @@ async def test_partial_collect_saves_and_reports(client: AsyncClient, fake_scrap
 
 
 @pytest.mark.asyncio
+async def test_preview_uses_ssrf_hook_and_hides_error_detail(client: AsyncClient, fake_scraper, monkeypatch):
+    import bid_collectors
+
+    monkeypatch.setattr(bid_collectors, "GenericScraper", scraper_collection.GenericScraper)  # 같은 가짜
+    resp = await client.post("/api/auth/register", json={
+        "email": f"pv-{uuid.uuid4().hex[:8]}@example.com", "password": "password123",
+        "name": "U", "company_name": "C"})
+    headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    added = (await client.post("/api/sources", json={"url": f"https://p-{uuid.uuid4().hex[:6]}.com/b"},
+                               headers=headers)).json()
+    await scraper_analysis.run_analysis(added["scraper_id"])
+    url = f"/api/sources/{added['subscription_id']}/preview"
+
+    fake_scraper["hooks"] = None
+    resp = await client.get(url, headers=headers)
+    assert resp.status_code == 200 and resp.json()["notices_count"] == 2
+    assert fake_scraper["hooks"] == {"request": [guard_request]}
+
+    # 1페이지 실패는 "0건"이 아니라 오류로
+    fake_scraper["notices"], fake_scraper["errors"] = [], ["페이지 1 요청 실패: http://10.0.0.1/"]
+    resp = await client.get(url, headers=headers)
+    assert resp.status_code == 502
+
+    # 예외 원문(내부 주소 등)은 응답에 싣지 않는다
+    fake_scraper["raise"] = RuntimeError("connect to 10.0.0.1 failed")
+    resp = await client.get(url, headers=headers)
+    assert resp.status_code == 500 and "10.0.0.1" not in resp.text
+
+
+@pytest.mark.asyncio
 async def test_titles_are_saved_with_normal_spaces(client: AsyncClient, fake_scraper):
     # 실측: 게시판 제목의 \xa0 때문에 키워드 '운영 대행'이 매칭되지 않았다
     fake_scraper["notices"] = [_notice(1).model_copy(update={"title": "크루즈\xa0포럼\xa0운영\xa0대행용역  입찰"})]

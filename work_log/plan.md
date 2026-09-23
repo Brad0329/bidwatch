@@ -86,8 +86,6 @@
 - **템플릿 규칙 위반 — 이식 시점(2026-09-23) 발견, 코드 미수정**. 착수 시 한 커밋씩:
   - `backend/app/tasks/collect_api.py:149` `except ImportError: pass` — 조용한 실패(celery 미설치 시 태스크 등록을
     건너뛰는 의도이나 로그·주석 없음). 로그 한 줄 + 이유 주석.
-  - `backend/app/routers/sources.py:261` 미리보기 실패 시 `detail=f"스크래핑 실패: {e}"` — 예외 원문이 응답에 노출
-    (보안 ① "오류 응답에는 상태만"). 원인은 로그로, 응답은 상태만.
 - **테스트가 개발 DB를 공유** — `backend/tests/conftest.py`가 앱의 DATABASE_URL을 그대로 쓴다. 테스트가 회원가입 등으로
   개발 DB에 행을 쌓는다. 분리하려면 테스트 전용 DB + alembic upgrade 픽스처(일반 트랙 — 사용자 확인 필요).
 - **수용 기준의 테스트 미대응** — F-004~F-008·F-010·F-011 필터 부분은 백엔드 테스트가 없다(`docs/REQUIREMENTS.md`에

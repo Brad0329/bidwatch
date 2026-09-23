@@ -249,7 +249,13 @@ async def preview_scraper(
         gs = GenericScraper(scraper.scraper_config, event_hooks={"request": [guard_request]})
         collect_result = await gs.collect(days=30)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"스크래핑 실패: {e}")
+        # 원인은 로그로만 — 응답에 예외 원문(내부 URL·경로)을 싣지 않는다
+        logger.warning(f"[preview] scraper={scraper.id} 수집 예외: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="스크래핑 실패")
+    if collect_result.errors and not collect_result.notices:
+        # 1페이지부터 실패(사이트 장애·차단된 요청) — "공고 0건"으로 보이지 않게
+        logger.warning(f"[preview] scraper={scraper.id} 요청 실패: {collect_result.errors[:3]}")
+        raise HTTPException(status_code=502, detail="사이트에서 공고를 가져오지 못했습니다")
 
     notices_dicts = [n.model_dump(mode="json") for n in collect_result.notices[:20]]
 
