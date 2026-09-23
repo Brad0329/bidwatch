@@ -21,6 +21,7 @@ out/
 
 # AI 커밋 메시지 파일 (고정 경로 — docs/playbooks/노하우_승인_대기_최소화.md 참조)
 .commit_msg.txt
+scripts/_tmp/
 
 # 테스트 캐시
 .pytest_cache/
