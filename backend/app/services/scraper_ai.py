@@ -127,7 +127,7 @@ async def analyze_url(url: str) -> dict:
     try:
         html = await fetch_page_html(normalized)
     except Exception as e:
-        raise ValueError(f"페이지를 가져올 수 없습니다: {e}")
+        raise ValueError(f"페이지를 가져올 수 없습니다: {e}") from e
 
     if len(html.strip()) < 100:
         raise ValueError("페이지 내용이 너무 짧습니다")
@@ -146,7 +146,7 @@ async def analyze_url(url: str) -> dict:
             }],
         )
     except Exception as e:
-        raise ValueError(f"AI 분석 실패: {e}")
+        raise ValueError(f"AI 분석 실패: {e}") from e
 
     # 3. JSON 파싱
     raw_text = response.content[0].text.strip()
@@ -158,8 +158,8 @@ async def analyze_url(url: str) -> dict:
 
     try:
         config = json.loads(raw_text)
-    except json.JSONDecodeError:
-        raise ValueError(f"AI 응답을 JSON으로 파싱할 수 없습니다: {raw_text[:200]}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"AI 응답을 JSON으로 파싱할 수 없습니다: {raw_text[:200]}") from e
 
     # 4. 필수 필드 검증
     required = ["list_selector", "title_selector", "date_selector"]
