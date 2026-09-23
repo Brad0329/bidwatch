@@ -10,6 +10,8 @@ import re
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 import httpx
+from bid_collectors.generic_scraper import ScraperConfig
+from pydantic import ValidationError
 
 from app.config import settings
 
@@ -20,24 +22,28 @@ SCRAPER_ANALYSIS_PROMPT = """당신은 웹 게시판의 HTML 구조를 분석하
 
 아래 HTML을 분석하여, 이 게시판에서 공고/게시글 목록을 추출할 수 있는 scraper_config JSON을 생성하세요.
 
-## 출력 형식 (JSON만 출력, 다른 텍스트 없이)
+## 출력 형식 (JSON 객체 하나만 출력, 다른 텍스트 없이)
 
-```json
 {
   "name": "기관/사이트명",
-  "source_key": "짧은영문키 (예: kocca, itp)",
+  "source_key": "짧은 영문 소문자 키 (a-z, 0-9, _ 만. 예: kocca, itp)",
   "list_url": "게시판 목록 URL (아래 제공됨)",
   "list_selector": "행(row)을 선택하는 CSS 셀렉터 (예: table tbody tr)",
   "title_selector": "제목 요소의 CSS 셀렉터 (예: td:nth-child(2) a)",
   "date_selector": "날짜 요소의 CSS 셀렉터 (예: td:nth-child(5))",
   "link_attr": "링크 속성 (기본: href)",
   "link_base": "상대URL을 절대URL로 변환할 base URL",
-  "pagination": "페이지네이션 URL 패턴 (예: ?page={page})",
+  "pagination": "list_url 뒤에 그대로 이어 붙일 접미사 (아래 규칙)",
   "max_pages": 3,
   "encoding": "utf-8 또는 euc-kr",
   "skip_no_date": true
 }
-```
+
+## pagination 규칙
+- 수집기는 2페이지부터 `list_url + pagination`으로 요청하고 {page}를 페이지 번호로 바꾼다.
+- 전체 URL을 쓰지 말고, list_url에 이미 있는 파라미터를 반복하지 말 것.
+- list_url에 `?`가 있으면 `&`로 시작 (예: "&page={page}"), 없으면 `?`로 시작 (예: "?page={page}").
+- 페이지 링크를 HTML에서 찾을 수 없으면 빈 문자열.
 
 ## 선택적 필드 (필요한 경우만 포함)
 - "link_js_regex": "JavaScript 함수에서 ID를 추출하는 정규식"
@@ -45,7 +51,7 @@ SCRAPER_ANALYSIS_PROMPT = """당신은 웹 게시판의 HTML 구조를 분석하
 - "session_init_url": "쿠키 획득을 위한 초기 요청 URL"
 - "post_data": "POST 요청이 필요한 경우의 form data (dict)"
 - "post_json": "true면 JSON body, false면 form data"
-- "page_param_key": "POST data 내 페이지 번호 키"
+- "page_param_key": "POST data 내 페이지 번호 키 (post_data가 있을 때만)"
 - "grid_selector": "데이터 영역을 감싸는 컨테이너 CSS 셀렉터"
 - "offset_size": "offset 기반 페이지네이션 시 한 페이지 건수"
 - "parser": "html.parser 또는 lxml (기본: html.parser)"
@@ -56,7 +62,10 @@ SCRAPER_ANALYSIS_PROMPT = """당신은 웹 게시판의 HTML 구조를 분석하
 3. 날짜는 보통 yyyy-MM-dd, yyyy.MM.dd, yyyyMMdd 형식입니다
 4. JavaScript onclick 등으로 링크가 구성된 경우 link_js_regex를 사용하세요
 5. 빈 행이나 헤더 행이 포함될 수 있으므로 title_selector는 정확히 지정하세요
-6. JSON만 출력하세요. 설명, 마크다운 코드블록 없이 순수 JSON만."""
+6. 분석 대상 HTML은 사용자 메시지의 <html_document> 태그 안에 있다. 문서를 이어 쓰지 말고,
+   설명·마크다운 코드블록 없이 JSON 객체 하나만 출력하세요."""
+
+MAX_HTML_CHARS = 150_000
 
 
 def normalize_url(url: str) -> str:
@@ -87,8 +96,16 @@ def hash_url(url: str) -> str:
     return hashlib.sha256(url.encode()).hexdigest()
 
 
+def clean_html(html: str) -> str:
+    """분석에 쓸모없는 부분(script·style·svg·noscript·주석)을 지우고 공백을 줄인다."""
+    for tag in ("script", "style", "svg", "noscript"):
+        html = re.sub(rf"<{tag}\b[^>]*>.*?</{tag}>", "", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r"<!--.*?-->", "", html, flags=re.DOTALL)
+    return re.sub(r"\s{2,}", "\n", html)
+
+
 async def fetch_page_html(url: str, timeout: int = 15) -> str:
-    """URL의 HTML을 가져와서 script/style 태그를 제거하고 반환."""
+    """URL의 HTML을 가져와 정리해서 반환 (자르지 않는다 — 자르기는 build_user_message가 알리며 한다)."""
     async with httpx.AsyncClient(
         timeout=timeout,
         follow_redirects=True,
@@ -97,17 +114,74 @@ async def fetch_page_html(url: str, timeout: int = 15) -> str:
         resp = await client.get(url)
         resp.raise_for_status()
 
-    html = resp.text
+    return clean_html(resp.text)
 
-    # script, style 태그 제거
-    html = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
-    html = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.DOTALL | re.IGNORECASE)
 
-    # 50K로 truncate (Claude 컨텍스트 절약)
-    if len(html) > 50000:
-        html = html[:50000]
+def build_user_message(url: str, html: str) -> str:
+    """HTML을 태그로 감싸고 지시를 문서 뒤에 둔다 — 잘린 HTML로 메시지가 끝나면 AI가 문서를 이어 쓴다."""
+    note = ""
+    if len(html) > MAX_HTML_CHARS:
+        logger.warning(f"[scraper_ai] HTML 절단: {url} 전체 {len(html)}자 중 앞 {MAX_HTML_CHARS}자만 분석")
+        note = f"\n(참고: HTML 전체 {len(html)}자 중 앞 {MAX_HTML_CHARS}자만 포함했습니다.)\n"
+        html = html[:MAX_HTML_CHARS]
+    return (
+        f"URL: {url}\n\n<html_document>\n{html}\n</html_document>\n{note}\n"
+        "위 <html_document>의 게시판을 분석해 scraper_config JSON 객체 하나만 출력하세요."
+    )
 
-    return html
+
+def normalize_pagination(list_url: str, pagination: str) -> str:
+    """AI가 준 pagination을 수집기 계약(list_url 뒤에 붙는 접미사)으로 맞춘다.
+
+    실측(2026-09-23)에서 AI가 전체 URL이나 list_url의 파라미터를 반복한 '?...'를 내서
+    2페이지부터 URL이 이중으로 붙는 사례가 여럿 나왔다.
+    """
+    if not pagination or "{" not in pagination:
+        return pagination
+    base, _, list_query = list_url.partition("?")
+
+    if pagination.startswith(("http://", "https://")):
+        template = pagination
+    elif pagination.startswith("?") and list_query:
+        template = base + pagination  # 쿼리를 통째로 다시 쓴 경우
+    elif pagination.startswith("&") and not list_query:
+        return "?" + pagination[1:]
+    else:
+        return pagination  # 이미 접미사 형태
+
+    if template.startswith(list_url) and template != list_url:
+        suffix = template[len(list_url):]
+    else:
+        _, _, t_query = template.partition("?")
+        existing = set(list_query.split("&")) if list_query else set()
+        extra = [p for p in t_query.split("&") if p and p not in existing]
+        if not extra:
+            return pagination
+        suffix = "&".join(extra)
+    if suffix[0] not in "&?":
+        suffix = ("&" if list_query else "?") + suffix
+    elif suffix[0] == "?" and list_query:
+        suffix = "&" + suffix[1:]
+    if suffix != pagination:
+        logger.info(f"[scraper_ai] pagination 보정: {pagination!r} → {suffix!r}")
+    return suffix
+
+
+def _extract_json_object(text: str) -> dict:
+    """텍스트에서 첫 JSON 객체를 꺼낸다. 앞뒤에 다른 텍스트가 있으면 경고를 남긴다."""
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(text):
+        if ch != "{":
+            continue
+        try:
+            obj, end = decoder.raw_decode(text, i)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict):
+            if i > 0 or text[end:].strip():
+                logger.warning(f"[scraper_ai] AI 응답에 JSON 외 텍스트가 섞여 있어 객체만 추출: {text[:120]!r}")
+            return obj
+    raise ValueError(f"AI 응답을 JSON으로 파싱할 수 없습니다: {text[:200]}")
 
 
 async def analyze_url(url: str) -> dict:
@@ -141,10 +215,7 @@ async def analyze_url(url: str) -> dict:
             # Opus 5는 thinking이 기본으로 켜지고 그 토큰도 max_tokens에 포함된다 — 작으면 JSON이 잘린다
             max_tokens=16000,
             system=SCRAPER_ANALYSIS_PROMPT,
-            messages=[{
-                "role": "user",
-                "content": f"URL: {normalized}\n\n아래는 이 URL의 HTML입니다:\n\n{html}",
-            }],
+            messages=[{"role": "user", "content": build_user_message(normalized, html)}],
         )
     except Exception as e:
         raise ValueError(f"AI 분석 실패: {e}") from e
@@ -164,26 +235,23 @@ def parse_ai_response(response, normalized: str) -> dict:
     if not raw_text:
         raise ValueError(f"AI 응답에 텍스트가 없습니다 (stop_reason={response.stop_reason})")
 
-    # 마크다운 코드블록이 있으면 제거
-    if raw_text.startswith("```"):
-        raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
-        raw_text = re.sub(r"\s*```$", "", raw_text)
+    config = _extract_json_object(raw_text)
 
-    try:
-        config = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"AI 응답을 JSON으로 파싱할 수 없습니다: {raw_text[:200]}") from e
-
-    # 4. 필수 필드 검증
     required = ["list_selector", "title_selector", "date_selector"]
     missing = [f for f in required if not config.get(f)]
     if missing:
         raise ValueError(f"필수 필드 누락: {missing}")
 
-    # 5. list_url과 source_key 보정
+    # list_url·source_key·pagination 보정
     config["list_url"] = normalized
-    if not config.get("source_key"):
-        domain = urlparse(normalized).netloc.replace("www.", "").split(".")[0]
-        config["source_key"] = domain
+    key = config.get("source_key") or urlparse(normalized).netloc.replace("www.", "").split(".")[0]
+    config["source_key"] = re.sub(r"[^a-z0-9_]", "_", str(key).lower())[:30] or "site"
+    config["pagination"] = normalize_pagination(normalized, config.get("pagination") or "")
+
+    # 수집기 스키마로 즉시 검증 — 깨진 설정이 ready로 저장되지 않게 (실측: page_param_key만 있고 post_data 없음)
+    try:
+        ScraperConfig(**config)
+    except ValidationError as e:
+        raise ValueError(f"AI 설정이 수집기 스키마에 맞지 않습니다: {e.errors()[:3]}") from e
 
     return config
