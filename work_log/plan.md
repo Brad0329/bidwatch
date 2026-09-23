@@ -106,5 +106,8 @@
   html.parser 1/10행, lxml 10/10행). 손 설정이 `"parser": "lxml"`이던 이유. → parser 자동 전환 + "제목 있는 행 중
   날짜 파싱 50% 미만" 탈락 기준 추가 후 ctp 단독 재측정 30/30(parser=lxml).
   남은 실패 5곳: analyze_url fetch의 SSL 검증 3곳(kcpi·dicia·jica) / POST 전용 1곳(gntp) / 사이트 측 0건 제외.
+- **승인 규칙 효과 확인 (2026-09-23 `/approval-audit`, `a3a7131`)** — ruff·git 읽기·git push·bid-collectors 교차
+  작업을 settings.local.json에 열었다. 다음 세션에서 `python scripts/measure_wait.py --grep ruff`(·`git -C`)로
+  8초 초과가 사라졌는지 확인하고 이 줄을 지운다.
 - **SSRF 점검** — F-009는 사용자가 준 URL을 서버가 가져온다. 내부망 주소(localhost·사설 IP·메타데이터 주소) 차단 여부
   미확인. 늦어도 Phase 011 전체 리뷰에서, 가능하면 F-009를 다음에 건드릴 때 보안 ② 범위 점검.
