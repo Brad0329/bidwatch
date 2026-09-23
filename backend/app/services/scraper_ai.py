@@ -220,15 +220,33 @@ def judge_trial(config: dict, diag: dict | None, titles: list[str]) -> str | Non
     if not titles:
         return f"수집 0건 (1페이지 진단: {diag})"
     # POST 설정은 받은 HTML과 수집기가 보는 응답이 달라 1페이지 진단을 쓰지 않는다
-    if diag and config.get("post_data") is None and diag["dated"]:
-        coverage = diag["titled_dated"] / diag["dated"]
-        if coverage < MIN_TRIAL_COVERAGE:
+    if diag and config.get("post_data") is None:
+        if diag["dated"] and diag["titled_dated"] / diag["dated"] < MIN_TRIAL_COVERAGE:
             return (f"날짜가 있는 {diag['dated']}행 중 제목이 잡힌 행이 {diag['titled_dated']}행뿐"
                     f" — title_selector가 일부 행에만 맞음")
+        # 실측(충남테크노파크): 제목은 10행 다 잡혔는데 날짜가 1행만 파싱 → 수집 3건
+        if diag["titled"] >= 4 and diag["titled_dated"] / diag["titled"] < MIN_TRIAL_COVERAGE:
+            return (f"제목이 잡힌 {diag['titled']}행 중 날짜가 파싱된 행이 {diag['titled_dated']}행뿐"
+                    f" — date_selector가 일부 행에만 맞음")
     median_len = statistics.median(len(t) for t in titles)
     if median_len < MIN_TITLE_LEN:
         return f"제목이 너무 짧음(중앙값 {median_len}자) — 분류 라벨을 제목으로 잡은 것으로 의심: {titles[:5]}"
     return None
+
+
+def prefer_better_parser(config: dict, diag: dict, html: str) -> dict:
+    """html.parser가 깨진 HTML을 잘못 읽는 사이트가 있다 — lxml이 더 많은 행을 잡으면 바꾼다.
+
+    실측(충남테크노파크): 같은 셀렉터로 html.parser는 날짜 1/10행, lxml은 10/10행.
+    """
+    if (config.get("parser") or "html.parser") != "html.parser":
+        return diag
+    alt = diagnose_config(dict(config, parser="lxml"), html)
+    if alt["titled_dated"] > diag["titled_dated"]:
+        logger.info(f"[scraper_ai] parser를 lxml로 전환: 제목+날짜 {diag['titled_dated']}행 → {alt['titled_dated']}행")
+        config["parser"] = "lxml"
+        return alt
+    return diag
 
 
 async def trial_collect(config: dict) -> list[str]:
@@ -261,6 +279,14 @@ async def analyze_url(url: str) -> dict:
         raise ValueError("페이지 내용이 너무 짧습니다")
 
     client = _make_client()
+    try:
+        return await _generate_validated(client, normalized, html)
+    finally:
+        # 닫지 않으면 asyncio.run 종료 뒤 GC가 닫으려다 'Event loop is closed'를 낸다(3차 실측에서 관찰)
+        await client.close()
+
+
+async def _generate_validated(client, normalized: str, html: str) -> dict:
     # HTML이 든 첫 메시지를 캐시해 재시도 때 입력 비용을 줄인다
     messages = [{"role": "user", "content": [{
         "type": "text", "text": build_user_message(normalized, html),
@@ -288,7 +314,7 @@ async def analyze_url(url: str) -> dict:
         try:
             config = parse_ai_response(response, normalized)
             try:
-                diag = diagnose_config(config, html)
+                diag = prefer_better_parser(config, diagnose_config(config, html), html)
             except Exception as e:  # 잘못된 CSS 셀렉터 문법 등
                 reason = f"셀렉터를 HTML에 적용할 수 없음: {e}"
             else:

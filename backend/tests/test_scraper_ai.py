@@ -135,6 +135,39 @@ def test_judge_rejects_low_coverage():
     assert "일부 행" in judge_trial(CONFIG, diag, LONG_TITLES)
 
 
+def test_judge_rejects_titles_without_dates():
+    # 실측 사례(충남테크노파크, html.parser): 제목 10행, 날짜 파싱 1행
+    diag = {"rows": 10, "titled": 10, "dated": 1, "titled_dated": 1, "sample_titles": []}
+    assert "date_selector" in judge_trial(CONFIG, diag, LONG_TITLES)
+
+
+# 닫히지 않은 <td>: html.parser는 다음 td를 앞 td 안에 중첩시키고, lxml은 형제로 복구한다
+BROKEN_TABLE_HTML = (
+    "<table><tbody>"
+    "<tr><td><a href='/1'>청사 시설물 유지보수 용역 입찰 공고</a><td>2026-09-20</tr>"
+    "<tr><td><a href='/2'>지역특화콘텐츠 개발지원 사업 공고</a><td>2026-09-18</tr>"
+    "</tbody></table>"
+)
+
+
+def test_parser_switches_to_lxml_when_it_reads_more_rows():
+    cfg = dict(CONFIG, title_selector="td a", date_selector="tr > td:nth-child(2)")
+    html_diag = diagnose_config(cfg, BROKEN_TABLE_HTML)
+    lxml_diag = diagnose_config(dict(cfg, parser="lxml"), BROKEN_TABLE_HTML)
+    assert lxml_diag["titled_dated"] > html_diag["titled_dated"]  # 전제: 이 HTML에서 두 파서가 다르다
+
+    diag = scraper_ai.prefer_better_parser(cfg, html_diag, BROKEN_TABLE_HTML)
+    assert cfg["parser"] == "lxml"
+    assert diag == lxml_diag
+
+
+def test_parser_kept_when_lxml_is_not_better():
+    cfg = dict(CONFIG, date_selector="td:nth-child(3)")
+    diag = scraper_ai.prefer_better_parser(cfg, diagnose_config(cfg, BOARD_HTML), BOARD_HTML)
+    assert cfg.get("parser", "html.parser") == "html.parser"
+    assert diag["titled_dated"] == 2
+
+
 def test_judge_skips_coverage_for_post_configs():
     diag = {"rows": 0, "titled": 0, "dated": 5, "titled_dated": 0, "sample_titles": []}
     assert judge_trial(dict(CONFIG, post_data={}), diag, LONG_TITLES) is None
@@ -151,6 +184,7 @@ class _FakeMessages:
     def __init__(self, replies):
         self.replies = list(replies)
         self.calls = []
+        self.closed = False
 
     async def create(self, **kwargs):
         self.calls.append([dict(m) for m in kwargs["messages"]])
@@ -161,7 +195,12 @@ class _FakeMessages:
 def fake_env(monkeypatch):
     def setup(replies, trial_titles):
         msgs = _FakeMessages(replies)
-        monkeypatch.setattr(scraper_ai, "_make_client", lambda: SimpleNamespace(messages=msgs))
+
+        async def close():
+            msgs.closed = True
+
+        monkeypatch.setattr(scraper_ai, "_make_client",
+                            lambda: SimpleNamespace(messages=msgs, close=close))
 
         async def fake_fetch(url):
             return BOARD_HTML + "x" * 100
@@ -196,6 +235,7 @@ async def test_all_attempts_fail_raises(fake_env):
     with pytest.raises(ValueError, match=f"시험 수집 실패\\({MAX_ATTEMPTS}회"):
         await scraper_ai.analyze_url(URL)
     assert len(msgs.calls) == MAX_ATTEMPTS
+    assert msgs.closed  # 실패해도 클라이언트를 닫는다
 
 
 @pytest.mark.asyncio

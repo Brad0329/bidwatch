@@ -119,10 +119,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("truth", nargs="?", default=str(DEFAULT_TRUTH))
     ap.add_argument("--limit", type=int, default=0, help="앞에서 N개만 (0=전체)")
+    ap.add_argument("--key", action="append", default=[], help="source_key로 골라 측정 (여러 번 가능)")
     args = ap.parse_args()
 
     truths = json.loads(Path(args.truth).read_text(encoding="utf-8"))
     total = len(truths)
+    if args.key:
+        truths = [t for t in truths if t["source_key"] in args.key]
+        print(f"--key {args.key}: 전체 {total}개 중 {len(truths)}개만 측정")
     if args.limit:
         truths = truths[: args.limit]
         print(f"--limit {args.limit}: 전체 {total}개 중 {len(truths)}개만 측정")
