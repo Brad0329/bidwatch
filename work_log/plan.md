@@ -91,6 +91,7 @@
   기준선 0건 10곳 중 3곳(ijto·kised·touraz)은 AI가 공고를 찾음 = 손 설정이 사이트 개편으로 낡음.
   부수 발견: AI가 pagination을 전체 URL이나 `?`로 시작하는 쿼리로 내서 2페이지부터 URL이 이중으로 붙음 /
   같은 사이트도 실행마다 설정이 달라짐(gwto 14건→7건) / bid-collectors `create_client`가 커스텀 transport를
-  써서 `verify_ssl=False`가 무시됨(dicia·jica 기준선 0건의 원인).
+  써서 `verify_ssl=False`가 무시됨(dicia·jica 기준선 0건의 원인 — bid-collectors `152f930`에서 수정, 실측 0→10·0→9건).
+  단 bidwatch `analyze_url`의 페이지 fetch는 여전히 SSL 검증을 켜므로 이 두 곳은 AI 분석 단계에서 실패한다.
 - **SSRF 점검** — F-009는 사용자가 준 URL을 서버가 가져온다. 내부망 주소(localhost·사설 IP·메타데이터 주소) 차단 여부
   미확인. 늦어도 Phase 011 전체 리뷰에서, 가능하면 F-009를 다음에 건드릴 때 보안 ② 범위 점검.
