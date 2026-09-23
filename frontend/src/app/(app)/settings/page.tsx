@@ -3,6 +3,7 @@
 import KeywordForm from "@/components/keywords/KeywordForm";
 import KeywordList from "@/components/keywords/KeywordList";
 import SourceList from "@/components/sources/SourceList";
+import UrlSourceList from "@/components/sources/UrlSourceList";
 import RegionSettings from "@/components/settings/RegionSettings";
 
 export default function SettingsPage() {
@@ -29,6 +30,13 @@ export default function SettingsPage() {
           </div>
           <div className="p-6">
             <SourceList />
+          </div>
+          <div className="px-6 pb-6 pt-2 border-t border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900 mt-4 mb-3 flex items-center gap-2">
+              <i className="ri-links-line text-green-500"></i>
+              직접 추가한 사이트
+            </h3>
+            <UrlSourceList />
           </div>
         </section>
 

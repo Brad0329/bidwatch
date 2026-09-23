@@ -93,6 +93,28 @@ export interface NoticeListResponse {
   page_size: number;
 }
 
+// URL 출처 구독 (AI 스크래퍼) — 백엔드 SubscriptionResponse
+export type ScraperStatus = "pending" | "analyzing" | "ready" | "failed";
+
+export interface UrlSubscription {
+  id: number;
+  scraper_id: number;
+  scraper_name: string;
+  scraper_status: ScraperStatus;
+  scraper_url: string;
+  custom_name: string | null;
+  is_active: boolean;
+  last_collected_at: string | null;
+  last_collected_count: number | null;
+}
+
+export interface UrlSourceAddResponse {
+  scraper_id: number;
+  subscription_id: number | null;
+  scraper_status: ScraperStatus;
+  message: string;
+}
+
 // Collection Stats
 export interface CollectionStats {
   bid_notices_count: number;
