@@ -35,6 +35,7 @@ CASES = [
     ("no_scratchpad_path.py",
      "python C:/Temp/claude/d0fe3eab-29eb-4a31-a94d-b3db864de789/scratchpad/x.py",
      "python scripts/measure_wait.py"),
+    ("no_shell_file_read.py", "sed -n '1,20p' x.py", "git log --oneline | head -5"),
 ]
 
 # 선택형 훅 — 초기화 때 Flutter가 아니면 파일째 지운다(CLAUDE.md 초기화 5번). 지웠으면 여기서도
