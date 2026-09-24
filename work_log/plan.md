@@ -124,6 +124,9 @@
   남은 것: ① 확인과 접속 사이 DNS 재바인딩(guard의 DNS 조회와 httpx의 조회가 따로다 — 접속 IP 고정이 필요).
   (② GenericScraper 리다이렉트 경로는 2026-09-23 bid-collectors v1.1 `event_hooks`로 닫음 — 시험·정기 수집·미리보기 3곳,
   실제 GenericScraper로 리다이렉트 차단 테스트 `test_generic_scraper_redirect_to_internal_is_blocked`)
+- **나라장터 밖 자체조달기관 수집 (2026-09-24 조사, `docs/procurement_sources_research.md`)** — LH·수자원공사·가스공사·
+  방위사업청·한전 등은 나라장터 API에 공고가 0~3건(2주 실측)이라 따로 받아야 한다. 앞 4곳은 data.go.kr 기관 API가 있다
+  (문서상, 미호출). 착수 시 기관별 API 실호출부터 — bid-collectors 새 수집기(인터페이스 변경이면 일반 트랙).
 - **URL 수집 제목의 게시판 배지 글자**: "핫이슈"·"새글" 등이 제목에 붙어 저장된다(실측 강원관광재단·광주정보문화산업진흥원).
   키워드 매칭에는 해가 적지만 목록 표시·중복 판정(F-014)에 걸린다. AI 프롬프트에 배지 요소 제외 지시 또는 bid-collectors
   제목 추출 개선으로 — 공백 정규화(`clean_title`)도 원래는 수집기(bid-collectors) 책임이라 그쪽으로 옮길 후보.
