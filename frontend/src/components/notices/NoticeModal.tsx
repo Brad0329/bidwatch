@@ -127,15 +127,18 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
               <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">
                 {notice.source_name}
               </span>
-              <span
-                className={`text-xs font-semibold ${
-                  notice.status === "ongoing"
-                    ? "bg-green-50 text-green-700"
-                    : "bg-gray-100 text-gray-500"
-                } px-2 py-0.5 rounded`}
-              >
-                {notice.status === "ongoing" ? "진행중" : "마감"}
-              </span>
+              {/* URL 출처는 bid-collectors가 status를 마감일이 아닌 게시일로 판정해 믿을 수 없다 — 배지를 숨긴다(2026-09-25) */}
+              {noticeType !== "scraped" && (
+                <span
+                  className={`text-xs font-semibold ${
+                    notice.status === "ongoing"
+                      ? "bg-green-50 text-green-700"
+                      : "bg-gray-100 text-gray-500"
+                  } px-2 py-0.5 rounded`}
+                >
+                  {notice.status === "ongoing" ? "진행중" : "마감"}
+                </span>
+              )}
               <span className={`text-xs font-bold ${dday.color}`}>
                 {dday.text}
               </span>
