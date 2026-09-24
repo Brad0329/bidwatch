@@ -31,11 +31,12 @@ export default function CollectionButton({
   sourceName,
   lastCollectedAt,
 }: Props) {
-  const defaultDate = lastCollectedAt
-    ? toLocalDateStr(new Date(lastCollectedAt))
-    : toLocalDateStr(new Date(Date.now() - 86400000));
-
-  const [fromDate, setFromDate] = useState(defaultDate);
+  // 초기값은 첫 렌더에 한 번만 — 렌더 중 Date.now() 호출 금지(react-hooks/purity)
+  const [fromDate, setFromDate] = useState(() =>
+    lastCollectedAt
+      ? toLocalDateStr(new Date(lastCollectedAt))
+      : toLocalDateStr(new Date(Date.now() - 86400000))
+  );
   const [result, setResult] = useState<string | null>(null);
   const mutation = useRunCollection();
   const qc = useQueryClient();
