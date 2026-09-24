@@ -28,6 +28,9 @@ logger = logging.getLogger("bidwatch.sources")
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 
+# 공공 출처 목록에서 앞에 둘 것 (collector_type → 순위). 나머지는 id 순으로 뒤에 — sorted는 안정 정렬이다
+SYSTEM_SOURCE_FIRST = {"nara": 0, "alio": 1}
+
 
 def _dispatch_analysis(background_tasks: BackgroundTasks, scraper_id: int):
     """AI 분석을 응답 뒤 백그라운드로 실행한다 (Redis·Celery 없이).
@@ -42,9 +45,9 @@ async def list_system_sources(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """공공 API 소스 목록 + 수집 상태."""
+    """공공 API 소스 목록 + 수집 상태. 화면 순서: 나라장터 → 알리오 → 나머지는 등록(id) 순 (2026-09-24 사용자 지정)."""
     result = await db.execute(select(SystemSource).order_by(SystemSource.id))
-    return result.scalars().all()
+    return sorted(result.scalars().all(), key=lambda s: SYSTEM_SOURCE_FIRST.get(s.collector_type, len(SYSTEM_SOURCE_FIRST)))
 
 
 @router.get("/system/subscriptions")
