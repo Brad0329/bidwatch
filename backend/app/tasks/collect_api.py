@@ -26,6 +26,7 @@ COLLECTOR_MAP = {
     "bizinfo": ("bid_collectors.bizinfo", "BizinfoCollector", "BIZINFO_API_KEY"),
     "subsidy24": ("bid_collectors.subsidy24", "Subsidy24Collector", "DATA_GO_KR_KEY"),
     "smes": ("bid_collectors.smes", "SmesCollector", "DATA_GO_KR_KEY"),
+    "alio": ("bid_collectors.alio", "AlioCollector", None),  # 공개 JSON — API 키 없음 (bid-collectors v1.2.0)
 }
 
 # nara 수집 시 사전규격도 같이 수집
@@ -45,6 +46,8 @@ def _get_collector(collector_type: str):
     module = importlib.import_module(module_path)
     cls = getattr(module, class_name)
 
+    if env_key is None:  # 키가 필요 없는 수집기
+        return cls()
     api_key = getattr(settings, env_key, "") or ""
     return cls(api_key=api_key)
 

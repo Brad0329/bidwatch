@@ -76,6 +76,7 @@ tenant_matches · subscriptions · notification_settings
 ## 변경 이력 (최신이 위)
 | 날짜 | 변경안 (무엇을, 왜, 영향 범위) | 사용자 확인 | 반영 |
 |---|---|---|---|
+| 2026-09-24 | 005: system_sources에 `alio`(알리오 공공기관 입찰공고) 행 추가 — 003(nara_prespec)과 같은 데이터 행 추가, 컬럼 변경 없음. 자체조달 공기업 공고를 공공 출처로 받기 위해(`procurement_sources_research.md` 3-1). 영향: 공공 출처 목록에 1행, 구독해야 공고 목록에 나온다. 되돌리기: 이 출처의 공고·구독이 있으면 downgrade 거부 | ✅ 2026-09-24 ("전용 수집기 + 공공 출처" 선택) | `005_add_alio_source.py` |
 | 2026-09-24 | 004: `scraper_registry.is_builtin BOOLEAN NOT NULL DEFAULT false` 추가 + `created_by_tenant_id` NULL 허용 — lets_portal 손 설정 39곳을 기본 제공 사이트로 옮겨 관리자설정에 목록 표시. 영향: 기존 행은 false·값 유지(데이터 변경 없음), 읽는 곳은 새 목록 API 1개, `created_by_tenant_id`는 쓰기만 하고 읽는 코드 없음. 되돌리기: 기본 제공 행(NULL)이 있으면 downgrade가 거부하고 멈춘다(조용히 지우지 않음) — 실측: 행 없을 때 왕복 OK·데이터 digest 동일, 행 있을 때 거부·004 유지. 백업 `scripts/_tmp/backup_before_004_*.dump` | ✅ 2026-09-24 | `004_scraper_builtin.py` |
 | 2026-04-13 | 003: system_sources에 nara_prespec 행 추가 — 입찰 예고(F-008) | ✅ | `003_add_nara_prespec_source.py` |
 | 2026-04-11 | 002: tenant_system_subscriptions 추가 — 사용자 직접 수집 → 출처 구독 구조 전환(F-004) | ✅ | `002_tenant_system_subscriptions.py` |

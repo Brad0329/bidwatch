@@ -42,6 +42,13 @@ from app.services.scraper_collection import collect_scraper  # noqa: E402
 DEFAULT_SOURCE = Path(r"C:\Users\user\Documents\lets_portal\backend\collectors\scraper_configs.json")
 WORKERS = 5
 
+# 기본 제공 사이트로 옮기지 않는 손 설정 — 재실행 때 다시 들어오지 않게 (list_url → 이유)
+EXCLUDED = {
+    # lets_portal에서 "신용보증기금"으로 잘못 붙은 알리오 전체 입찰공고. 화면이 JS라 GenericScraper로는 못 읽고,
+    # 공개 JSON을 쓰는 공공 출처 'alio'(bid-collectors AlioCollector, 마이그레이션 005)로 받는다(2026-09-24).
+    "https://alio.go.kr/occasional/bidList.do": "공공 출처 '알리오 공공기관 입찰공고'로 수집",
+}
+
 logger = logging.getLogger("import_builtin_sites")
 
 
@@ -149,6 +156,9 @@ async def restore_name(scraper_id: int, name: str) -> None:
 
 async def main_async(args) -> int:
     hands = json.loads(Path(args.source).read_text(encoding="utf-8"))
+    for h in [h for h in hands if h["list_url"] in EXCLUDED]:
+        print(f"  [EXCLUDED] {h['name']} ({h['list_url']}): {EXCLUDED[h['list_url']]}")
+    hands = [h for h in hands if h["list_url"] not in EXCLUDED]
     print(f"{'[dry-run] ' if args.dry_run else ''}사이트 {len(hands)}곳 · 동시 {WORKERS}")
     sem = asyncio.Semaphore(WORKERS)
     rows = await asyncio.gather(*(process(h, args.dry_run, args.retry_failed, sem) for h in hands),

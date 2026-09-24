@@ -67,7 +67,7 @@
 ```
 [공유 데이터 — 전체 고객]
   ├── bid_notices          공공 API 수집 공고
-  ├── system_sources       공공 API 출처 정보 (6개: nara, nara_prespec, kstartup, bizinfo, subsidy24, smes)
+  ├── system_sources       공공 API 출처 정보 (7개: nara, nara_prespec, kstartup, bizinfo, subsidy24, smes, alio)
   ├── scraper_registry     URL별 스크래퍼 설정 (AI 생성)
   └── scraped_notices      스크래퍼 수집 공고
 
@@ -117,6 +117,7 @@
 | 기업마당 | bizinfo | BizinfoCollector |
 | 보조금24 | subsidy24 | Subsidy24Collector |
 | 중소벤처기업부 | smes | SmesCollector |
+| 알리오 공공기관 입찰공고 | alio | AlioCollector (API 키 없음, 2026-09-24) |
 
 ### 수집 방식
 - 현재: 관리자가 수동 실행 (sync 모드, POST /api/admin/collection/run)

@@ -60,6 +60,11 @@
 ### F-004: 공공 API 출처 구독 — 테넌트별로 출처를 구독/해제
 - **수용 기준**: [x] 시스템 출처 목록이 반환된다 → `test_list_system_sources` ·
   [ ] 구독 후 구독 ID 목록에 포함되고, 해제 후 빠진다 → 테스트 없음
+- **알리오 공공기관 입찰공고(`alio`, 2026-09-24, 마이그레이션 005 · bid-collectors v1.2.0 `AlioCollector`)**: 자체조달
+  공기업(수자원·코레일·한전·LH…) 공고용 — 나라장터 API에 없다(`procurement_sources_research.md` 3-1). API 키 없음.
+  - [x] DB의 모든 collector_type이 수집기 매핑에 있고 실제로 생성된다(알리오는 키 없이) →
+    `test_every_system_source_has_a_constructible_collector` · `test_alio_collector_needs_no_api_key`
+  - [ ] 관리자설정에 "알리오 공공기관 입찰공고"가 나오고, 구독 → 수집 → 공고 목록에 기관명과 함께 나온다 (사용자 실테스트)
 - **상태**: 완료 (보조금24·nara_prespec은 프론트 `HIDDEN_TYPES`로 설정 화면에서 숨김)
 
 ### F-005: 키워드 관리
@@ -133,10 +138,11 @@
   - [ ] 공고 목록에서 URL 출처 공고를 열고 태그를 붙일 수 있다 (사용자 실테스트)
   - [x] 기본 제공 사이트(운영자가 미리 등록, `is_builtin`) 목록은 owner·admin만 보고, 다른 회사가 직접 추가한 URL은
     나오지 않는다 (2026-09-24) → `test_builtin_list_shows_only_builtin_not_other_tenants_urls` · `test_member_cannot_list_builtin`
-  - [ ] 관리자설정 "기본 제공 사이트"에 39곳이 이름·상태·최근 수집 건수·주소로 모두 나온다 (사용자 실테스트)
+  - [ ] 관리자설정 "기본 제공 사이트"에 38곳이 이름·상태·최근 수집 건수·주소로 모두 나온다 (사용자 실테스트)
   - 기본 제공 사이트 등록: `backend/scripts/import_builtin_sites.py`(lets_portal 손 설정 → 시험 수집 → 탈락분 AI).
-    2026-09-24 실행: 39곳 중 ready 35(손 설정 27·AI 7·기존 1), 실패 4(신용보증기금 JS 렌더링 / KIAT 500 /
-    충남TP 503 / 디자인진흥원 타임아웃) — 사이트가 살아나면 `--retry-failed`
+    2026-09-24 실행: 38곳 중 ready 35(손 설정 27·AI 7·기존 1), 실패 3(KIAT 500 / 충남TP 503 / 디자인진흥원 타임아웃)
+    — 사이트가 살아나면 `--retry-failed`. lets_portal의 "신용보증기금"은 실제로 알리오 전체 게시판이라 제외하고
+    공공 출처 `alio`로 받는다(F-004)
   - [x] 등록 이름(custom_name)은 앞뒤 공백을 지워 저장하고, 빈 이름은 422(기존 이름 유지) (2026-09-24)
     → `test_custom_name_is_trimmed_and_blank_rejected`
   - [ ] 분석이 "사용 가능"이 되고 이름을 정하지 않은 사이트에 "[이름] 을(를) 등록하시겠습니까?" 카드가 펼쳐진다 —
