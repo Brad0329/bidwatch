@@ -22,17 +22,24 @@ const decode = (v: string): SourceFilter => {
 export default function SourceSelect({
   value,
   onChange,
+  preSpec = false,
 }: {
   value: SourceFilter;
   onChange: (f: SourceFilter) => void;
+  /** 입찰 예고: 출처가 나라장터 사전규격으로 고정(F-008) — 구독과 무관하게 그 출처만 */
+  preSpec?: boolean;
 }) {
   const { data: systemSources } = useSystemSources();
   const { data: subscribedIds } = useSystemSubscriptions();
   const { data: urlSubs } = useUrlSubscriptions();
 
-  const system = (systemSources || []).filter((s) => subscribedIds?.includes(s.id));
+  const system = (systemSources || []).filter((s) =>
+    preSpec ? s.collector_type === "nara_prespec" : subscribedIds?.includes(s.id)
+  );
   // 공고 목록의 출처 이름과 같은 규칙: 사용자가 정한 이름 → 없으면 AI가 읽은 이름
-  const sites = (urlSubs || []).filter((s) => s.is_active && s.scraper_status === "ready");
+  const sites = preSpec
+    ? []
+    : (urlSubs || []).filter((s) => s.is_active && s.scraper_status === "ready");
 
   return (
     <select
