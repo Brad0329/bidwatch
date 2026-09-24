@@ -39,6 +39,18 @@ class SystemSourceResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class BuiltinSiteResponse(BaseModel):
+    """기본 제공 사이트 — 운영자가 미리 등록한 것만(사용자가 추가한 URL은 다른 회사에 보이지 않는다)."""
+    id: int
+    name: str
+    url: str
+    status: str
+    last_collected_at: datetime | None
+    last_collected_count: int | None
+
+    model_config = {"from_attributes": True}
+
+
 class PreviewResponse(BaseModel):
     scraper_name: str
     notices_count: int

@@ -11,6 +11,7 @@ from app.models.scraper import ScraperRegistry, TenantSourceSubscription
 from app.models.subscription import TenantSystemSubscription
 from app.models.tenant import Tenant, User
 from app.schemas.source import (
+    BuiltinSiteResponse,
     PreviewResponse,
     SourceAddRequest,
     SourceAddResponse,
@@ -109,6 +110,20 @@ async def unsubscribe_system_source(
     await db.delete(sub)
     await db.commit()
     return {"message": "구독 해제 완료"}
+
+
+@router.get("/builtin", response_model=list[BuiltinSiteResponse])
+async def list_builtin_sites(
+    user: User = Depends(require_admin),  # 관리자설정 화면 — owner·admin
+    db: AsyncSession = Depends(get_db),
+):
+    """기본 제공 사이트 목록 (is_builtin만 — 다른 회사가 직접 추가한 URL은 넣지 않는다)."""
+    result = await db.execute(
+        select(ScraperRegistry)
+        .where(ScraperRegistry.is_builtin.is_(True))
+        .order_by(ScraperRegistry.name)
+    )
+    return result.scalars().all()
 
 
 @router.get("", response_model=list[SubscriptionResponse])

@@ -55,6 +55,13 @@ tenant_matches · subscriptions · notification_settings
 - **결정**: `scraper_registry.url_hash`(정규화 URL의 SHA256) UNIQUE. 같은 URL은 스크래퍼 1개, 테넌트는 구독만 추가.
 - **이유**: 두 번째 테넌트부터 AI 분석 비용 0.
 
+- **기본 제공 사이트 (2026-09-24 — 004)**: 운영자가 미리 등록한 사이트는 `is_builtin = true`.
+  관리자설정의 "기본 제공 사이트" 목록에는 이 행만 나온다 — 사용자가 직접 추가한 URL은 다른 회사에 드러나지 않는다
+  (2026-09-23 결정 "다른 회사가 어떤 사이트를 지켜보는지 드러나지 않게" 유지). 기본 제공 행은 만든 회사가 없으므로
+  `created_by_tenant_id`는 NULL. 구독은 지금처럼 URL을 넣어 하고, 같은 URL이면 분석 없이 즉시 붙는다.
+  버린 대안: 등록 회사를 특정 테넌트로 지정(컬럼 추가 없이 가능하지만 그 회사가 "만든 것"으로 기록돼 F-016 운영자
+  분리 때 되돌려야 함) / `scraper_config`에 표시 키를 숨김(JSONB 안이라 조회·인덱스가 어색하고 설정 재생성 때 지워진다).
+
 ### 태그 — 공고당 1개
 - **결정**: `tenant_tags` UNIQUE `(tenant_id, notice_type, notice_id)`. 태그 값 허용 목록은 스키마가 아니라
   `backend/app/schemas/tag.py`의 `VALID_TAGS`에서 검증.
@@ -69,6 +76,7 @@ tenant_matches · subscriptions · notification_settings
 ## 변경 이력 (최신이 위)
 | 날짜 | 변경안 (무엇을, 왜, 영향 범위) | 사용자 확인 | 반영 |
 |---|---|---|---|
+| 2026-09-24 | 004: `scraper_registry.is_builtin BOOLEAN NOT NULL DEFAULT false` 추가 + `created_by_tenant_id` NULL 허용 — lets_portal 손 설정 39곳을 기본 제공 사이트로 옮겨 관리자설정에 목록 표시. 영향: 기존 행은 false·값 유지(데이터 변경 없음), 읽는 곳은 새 목록 API 1개, `created_by_tenant_id`는 쓰기만 하고 읽는 코드 없음. 되돌리기: 기본 제공 행(NULL)이 있으면 downgrade가 거부하고 멈춘다(조용히 지우지 않음) — 실측: 행 없을 때 왕복 OK·데이터 digest 동일, 행 있을 때 거부·004 유지. 백업 `scripts/_tmp/backup_before_004_*.dump` | ✅ 2026-09-24 | `004_scraper_builtin.py` |
 | 2026-04-13 | 003: system_sources에 nara_prespec 행 추가 — 입찰 예고(F-008) | ✅ | `003_add_nara_prespec_source.py` |
 | 2026-04-11 | 002: tenant_system_subscriptions 추가 — 사용자 직접 수집 → 출처 구독 구조 전환(F-004) | ✅ | `002_tenant_system_subscriptions.py` |
 | 2026-04-11 | 001: 초기 스키마 (공고·테넌트·사용자·키워드·태그·스크래퍼·프로필·매칭·결제·알림) | ✅ | `001_initial_schema.py` |

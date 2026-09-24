@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Date, ForeignKey, Index, Text, func
+from sqlalchemy import BigInteger, Date, ForeignKey, Index, Text, false, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,7 +21,8 @@ class ScraperRegistry(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     last_collected_at: Mapped[datetime | None] = mapped_column(default=None)
     last_collected_count: Mapped[int | None] = mapped_column(default=None)
-    created_by_tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"))
+    created_by_tenant_id: Mapped[int | None] = mapped_column(ForeignKey("tenants.id"))  # 기본 제공 = NULL
+    is_builtin: Mapped[bool] = mapped_column(default=False, server_default=false())  # 운영자가 미리 등록 (004)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
 

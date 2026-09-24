@@ -64,12 +64,13 @@ GET    /api/sources/system/subscriptions        내가 구독 중인 출처 ID �
 POST   /api/sources/system/{id}/subscribe       시스템 출처 구독
 DELETE /api/sources/system/{id}/unsubscribe     시스템 출처 구독 해제
 
+GET    /api/sources/builtin                     기본 제공 사이트 목록(owner·admin) — is_builtin만, 다른 회사 URL 제외
 GET    /api/sources                             내 커스텀 스크래퍼 구독 목록
 POST   /api/sources                             URL 추가(owner·admin) → 즉시 구독 + AI 분석 백그라운드 실행 (내부망 URL 400)
 GET    /api/sources/{sub_id}                    구독 상세 (스크래퍼 상태 폴링)
 GET    /api/sources/{sub_id}/preview            스크래퍼 테스트 수집 미리보기
 POST   /api/sources/{sub_id}/confirm            미리보기 확인 후 구독 확정
-PATCH  /api/sources/{sub_id}                    구독 수정 (별칭, 활성/비활성)
+PATCH  /api/sources/{sub_id}                    구독 수정 (별칭 — 공백 제거·빈 값 422·100자, 활성/비활성)
 DELETE /api/sources/{sub_id}                    구독 해제 (soft delete)
 ```
 

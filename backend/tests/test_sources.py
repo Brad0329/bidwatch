@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from app.database import get_session_factory
 from app.models.scraper import ScraperRegistry
@@ -171,6 +171,43 @@ async def test_run_analysis_unexpected_error_is_recorded_not_raised(client: Asyn
     monkeypatch.setattr(scraper_analysis.scraper_ai, "analyze_url", boom)
     assert await scraper_analysis.run_analysis(scraper_id) == "failed"  # 백그라운드라 던지지 않는다
     assert (await _scraper(scraper_id)).status == "failed"
+
+
+# ── 기본 제공 사이트 (2026-09-24, SCHEMA 004) ──
+
+@pytest.mark.asyncio
+async def test_builtin_list_shows_only_builtin_not_other_tenants_urls(client: AsyncClient):
+    other, _ = await _register(client)
+    private_url = f"https://private-{uuid.uuid4().hex[:6]}.com/b"
+    await client.post("/api/sources", json={"url": private_url}, headers=other)  # 다른 회사가 직접 추가
+
+    builtin_url = f"https://builtin-{uuid.uuid4().hex[:6]}.com/b"
+    builtin = ScraperRegistry(url=builtin_url, url_hash=uuid.uuid4().hex, name="기본제공기관",
+                              status="ready", created_by_tenant_id=None, is_builtin=True)
+    async with get_session_factory()() as db:
+        db.add(builtin)
+        await db.commit()
+    try:
+        me, _ = await _register(client)
+        resp = await client.get("/api/sources/builtin", headers=me)
+        assert resp.status_code == 200
+        urls = [s["url"] for s in resp.json()]
+        assert builtin_url in urls
+        assert private_url not in urls  # 다른 회사가 어떤 사이트를 지켜보는지 드러나지 않는다
+    finally:
+        # 테스트가 개발 DB를 쓴다 — 가짜 기본 제공 행이 남으면 실제 관리자설정 목록에 나온다(2026-09-24 실측 4행)
+        async with get_session_factory()() as db:
+            await db.execute(delete(ScraperRegistry).where(ScraperRegistry.id == builtin.id))
+            await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_member_cannot_list_builtin(client: AsyncClient):
+    headers, email = await _register(client)
+    async with get_session_factory()() as db:
+        await db.execute(update(User).where(User.email == email).values(role="member"))
+        await db.commit()
+    assert (await client.get("/api/sources/builtin", headers=headers)).status_code == 403
 
 
 # ── 등록 이름 (2026-09-24) ──

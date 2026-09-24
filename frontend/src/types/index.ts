@@ -99,6 +99,15 @@ export interface NoticeListResponse {
 // URL 출처 구독 (AI 스크래퍼) — 백엔드 SubscriptionResponse
 export type ScraperStatus = "pending" | "analyzing" | "ready" | "failed";
 
+export interface BuiltinSite {
+  id: number;
+  name: string;
+  url: string;
+  status: ScraperStatus;
+  last_collected_at: string | null;
+  last_collected_count: number | null;
+}
+
 export interface UrlSubscription {
   id: number;
   scraper_id: number;

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { SystemSource, UrlSourceAddResponse, UrlSubscription } from "@/types";
+import type { BuiltinSite, SystemSource, UrlSourceAddResponse, UrlSubscription } from "@/types";
 
 export function useSystemSources() {
   return useQuery<SystemSource[]>({
@@ -32,6 +32,18 @@ export function useSubscribe() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["system-subscriptions"] });
       qc.invalidateQueries({ queryKey: ["notices"] });
+    },
+  });
+}
+
+// ── 기본 제공 사이트 (운영자가 미리 등록, 관리자설정에서 보기만) ──
+
+export function useBuiltinSites() {
+  return useQuery<BuiltinSite[]>({
+    queryKey: ["builtin-sites"],
+    queryFn: async () => {
+      const res = await api.get("/api/sources/builtin");
+      return res.data;
     },
   });
 }

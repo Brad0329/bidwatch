@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import SourceList from "@/components/sources/SourceList";
+import BuiltinSiteList from "@/components/sources/BuiltinSiteList";
 
 export default function AdminSettingsPage() {
   const router = useRouter();
@@ -42,6 +43,22 @@ export default function AdminSettingsPage() {
           </div>
           <div className="p-6">
             <SourceList showCollection />
+          </div>
+        </section>
+
+        {/* 기본 제공 사이트 */}
+        <section className="bg-white rounded-xl border border-gray-100 shadow-sm">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <i className="ri-global-line text-blue-500"></i>
+              기본 제공 사이트
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">
+              BidWatch가 미리 등록해 둔 기관 게시판입니다.
+            </p>
+          </div>
+          <div className="p-6">
+            <BuiltinSiteList />
           </div>
         </section>
       </div>

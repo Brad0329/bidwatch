@@ -131,6 +131,12 @@
     source_and_scraper_filters·tag_on_url_notice)
   - [x] URL 출처 공고 상세는 그 사이트를 구독한 회사만 볼 수 있다(아니면 404) → `test_scraped_detail_only_for_subscribers`
   - [ ] 공고 목록에서 URL 출처 공고를 열고 태그를 붙일 수 있다 (사용자 실테스트)
+  - [x] 기본 제공 사이트(운영자가 미리 등록, `is_builtin`) 목록은 owner·admin만 보고, 다른 회사가 직접 추가한 URL은
+    나오지 않는다 (2026-09-24) → `test_builtin_list_shows_only_builtin_not_other_tenants_urls` · `test_member_cannot_list_builtin`
+  - [ ] 관리자설정 "기본 제공 사이트"에 39곳이 이름·상태·최근 수집 건수·주소로 모두 나온다 (사용자 실테스트)
+  - 기본 제공 사이트 등록: `backend/scripts/import_builtin_sites.py`(lets_portal 손 설정 → 시험 수집 → 탈락분 AI).
+    2026-09-24 실행: 39곳 중 ready 35(손 설정 27·AI 7·기존 1), 실패 4(신용보증기금 JS 렌더링 / KIAT 500 /
+    충남TP 503 / 디자인진흥원 타임아웃) — 사이트가 살아나면 `--retry-failed`
   - [x] 등록 이름(custom_name)은 앞뒤 공백을 지워 저장하고, 빈 이름은 422(기존 이름 유지) (2026-09-24)
     → `test_custom_name_is_trimmed_and_blank_rejected`
   - [ ] 분석이 "사용 가능"이 되고 이름을 정하지 않은 사이트에 "[이름] 을(를) 등록하시겠습니까?" 카드가 펼쳐진다 —
