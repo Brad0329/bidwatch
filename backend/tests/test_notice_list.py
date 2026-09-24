@@ -7,8 +7,9 @@ import uuid
 from datetime import date, timedelta
 
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from app.database import get_session_factory
 from app.models.notice import BidNotice, SystemSource
@@ -42,16 +43,33 @@ async def _url_source_with_notices(client, headers, token: str, n: int, name: st
     return data
 
 
-async def _bid_notice(token: str) -> tuple[int, int]:
-    """공공 출처(첫 번째 system_source)에 공고 1건을 넣고 (source_id, notice_id)."""
-    async with get_session_factory()() as db:
-        source_id = await db.scalar(select(SystemSource.id).order_by(SystemSource.id).limit(1))
-        notice = BidNotice(source_id=source_id, bid_no=f"T-{token}", title=f"{token} 청사 공사 입찰",
-                           organization="어느기관", url="https://example.go.kr/bid",
-                           start_date=date.today() + timedelta(days=1))
-        db.add(notice)
-        await db.commit()
-        return source_id, notice.id
+@pytest_asyncio.fixture
+async def bid_notice(client: AsyncClient):
+    """공공 출처(첫 번째 system_source)에 공고 1건을 넣고 (source_id, notice_id)를 돌려주는 팩토리.
+
+    bid_notices는 모든 테넌트가 공유하는 실제 공고 테이블이라, 넣은 행을 끝나면 지운다
+    (지우지 않아 개발 DB에 'T-' 공고 28건이 쌓여 제목 빈도 분석을 오염시킨 실사례, 2026-09-24).
+    client에 의존해 엔진이 dispose되기 전에 정리한다.
+    """
+    created: list[int] = []
+
+    async def make(token: str) -> tuple[int, int]:
+        async with get_session_factory()() as db:
+            source_id = await db.scalar(select(SystemSource.id).order_by(SystemSource.id).limit(1))
+            notice = BidNotice(source_id=source_id, bid_no=f"T-{token}", title=f"{token} 청사 공사 입찰",
+                               organization="어느기관", url="https://example.go.kr/bid",
+                               start_date=date.today() + timedelta(days=1))
+            db.add(notice)
+            await db.commit()
+            created.append(notice.id)
+            return source_id, notice.id
+
+    yield make
+
+    if created:
+        async with get_session_factory()() as db:
+            await db.execute(delete(BidNotice).where(BidNotice.id.in_(created)))
+            await db.commit()
 
 
 async def _list(client, headers, **params) -> dict:
@@ -91,10 +109,10 @@ async def test_unsubscribed_url_notices_disappear(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_bid_and_url_notices_merge_with_total_and_pages(client: AsyncClient):
+async def test_bid_and_url_notices_merge_with_total_and_pages(client: AsyncClient, bid_notice):
     token = uuid.uuid4().hex[:10]
     headers = await _tenant(client, keyword=token)
-    source_id, bid_id = await _bid_notice(token)
+    source_id, bid_id = await bid_notice(token)
     await client.post(f"/api/sources/system/{source_id}/subscribe", headers=headers)
     await _url_source_with_notices(client, headers, token, 2)
 
@@ -107,10 +125,10 @@ async def test_bid_and_url_notices_merge_with_total_and_pages(client: AsyncClien
 
 
 @pytest.mark.asyncio
-async def test_source_and_scraper_filters_narrow_to_one_kind(client: AsyncClient):
+async def test_source_and_scraper_filters_narrow_to_one_kind(client: AsyncClient, bid_notice):
     token = uuid.uuid4().hex[:10]
     headers = await _tenant(client, keyword=token)
-    source_id, _ = await _bid_notice(token)
+    source_id, _ = await bid_notice(token)
     await client.post(f"/api/sources/system/{source_id}/subscribe", headers=headers)
     src = await _url_source_with_notices(client, headers, token, 2)
 
