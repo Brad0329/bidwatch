@@ -68,6 +68,20 @@ export function useAddUrlSource() {
   });
 }
 
+export function useRenameUrlSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await api.patch<UrlSubscription>(`/api/sources/${id}`, { custom_name: name });
+      return res.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["url-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["notices"] });
+    },
+  });
+}
+
 export function useRemoveUrlSubscription() {
   const qc = useQueryClient();
   return useMutation({

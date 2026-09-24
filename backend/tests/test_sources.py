@@ -171,3 +171,21 @@ async def test_run_analysis_unexpected_error_is_recorded_not_raised(client: Asyn
     monkeypatch.setattr(scraper_analysis.scraper_ai, "analyze_url", boom)
     assert await scraper_analysis.run_analysis(scraper_id) == "failed"  # 백그라운드라 던지지 않는다
     assert (await _scraper(scraper_id)).status == "failed"
+
+
+# ── 등록 이름 (2026-09-24) ──
+
+@pytest.mark.asyncio
+async def test_custom_name_is_trimmed_and_blank_rejected(client: AsyncClient):
+    headers, _ = await _register(client)
+    resp = await client.post("/api/sources", json={"url": f"https://r-{uuid.uuid4().hex[:6]}.com/b"},
+                             headers=headers)
+    sub_id = resp.json()["subscription_id"]
+
+    ok = await client.patch(f"/api/sources/{sub_id}", json={"custom_name": "  우리 기관  "}, headers=headers)
+    assert ok.status_code == 200 and ok.json()["custom_name"] == "우리 기관"
+
+    blank = await client.patch(f"/api/sources/{sub_id}", json={"custom_name": "   "}, headers=headers)
+    assert blank.status_code == 422
+    subs = (await client.get("/api/sources", headers=headers)).json()
+    assert subs[0]["custom_name"] == "우리 기관"  # 빈 이름으로 덮이지 않았다

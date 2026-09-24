@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class SourceAddRequest(BaseModel):
@@ -48,3 +48,16 @@ class PreviewResponse(BaseModel):
 class SubscriptionUpdateRequest(BaseModel):
     custom_name: str | None = None
     is_active: bool | None = None
+
+    @field_validator("custom_name")
+    @classmethod
+    def _strip_name(cls, v: str | None) -> str | None:
+        # 빈 이름이 저장되면 목록·출처 선택에 이름 없는 출처가 생긴다
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("이름을 입력하세요")
+        if len(v) > 100:
+            raise ValueError("이름은 100자 이내로 입력하세요")
+        return v

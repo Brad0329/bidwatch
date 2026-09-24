@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   useAddUrlSource,
   useRemoveUrlSubscription,
+  useRenameUrlSubscription,
   useUrlSubscriptions,
 } from "@/lib/queries/useSources";
 import { useAuthStore } from "@/stores/authStore";
@@ -78,11 +79,14 @@ export default function UrlSourceList() {
           {active.map((s) => {
             const badge = STATUS_BADGE[s.scraper_status] ?? STATUS_BADGE.pending;
             const name = s.custom_name || (s.scraper_name !== s.scraper_url ? s.scraper_name : "");
+            // 분석을 통과했는데 아직 이름을 정하지 않은 사이트 — 이름 확인 카드를 펼친다
+            const needsConfirm = canAdd && s.scraper_status === "ready" && !s.custom_name;
             return (
               <li
                 key={s.id}
-                className="flex items-center gap-4 px-5 py-4 rounded-lg bg-gray-50 border border-transparent"
+                className={`rounded-lg border ${needsConfirm ? "bg-blue-50/40 border-blue-200" : "bg-gray-50 border-transparent"}`}
               >
+                <div className="flex items-center gap-4 px-5 py-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-gray-900 truncate">
@@ -129,11 +133,86 @@ export default function UrlSourceList() {
                     구독 해지
                   </button>
                 )}
+                </div>
+                {needsConfirm && (
+                  <ConfirmNameCard
+                    subscriptionId={s.id}
+                    defaultName={name}
+                    onCancel={() => removeMutation.mutate(s.id)}
+                    cancelling={removeMutation.isPending}
+                  />
+                )}
               </li>
             );
           })}
         </ul>
       )}
     </div>
+  );
+}
+
+function ConfirmNameCard({
+  subscriptionId,
+  defaultName,
+  onCancel,
+  cancelling,
+}: {
+  subscriptionId: number;
+  defaultName: string;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
+  const renameMutation = useRenameUrlSubscription();
+  const [value, setValue] = useState(defaultName);
+  const [error, setError] = useState("");
+  const trimmed = value.trim();
+
+  const handleConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!trimmed) return;
+    try {
+      await renameMutation.mutateAsync({ id: subscriptionId, name: trimmed });
+    } catch (err: unknown) {
+      console.error("[UrlSourceList] 사이트 이름 저장 실패", err);
+      setError("이름을 저장하지 못했습니다. 다시 시도해 주세요.");
+    }
+  };
+
+  return (
+    <form onSubmit={handleConfirm} className="border-t border-blue-100 px-5 py-4 space-y-3">
+      <p className="text-sm text-gray-700">
+        <span className="font-semibold text-gray-900">[{trimmed || "이름 없음"}]</span> 을(를) 등록하시겠습니까?
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          maxLength={100}
+          placeholder="사이트 이름"
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <button
+          type="submit"
+          disabled={!trimmed || renameMutation.isPending}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium whitespace-nowrap"
+        >
+          {renameMutation.isPending ? "저장 중..." : "확인"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={cancelling || renameMutation.isPending}
+          className="px-4 py-2 border border-gray-200 bg-white rounded-lg text-sm text-gray-600 hover:bg-gray-50 whitespace-nowrap"
+        >
+          취소
+        </button>
+      </div>
+      <p className="text-xs text-gray-400">
+        이 이름이 공고 목록의 출처로 표시됩니다. 취소하면 이 사이트 구독이 해지됩니다.
+      </p>
+      {error && <p className="text-sm text-red-500">{error}</p>}
+    </form>
   );
 }
