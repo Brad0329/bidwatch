@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotices } from "@/lib/queries/useNotices";
-import { useRegionPreference } from "@/lib/queries/useRegions";
 import RegionFilter from "@/components/filters/RegionFilter";
 import NoticeTable from "@/components/notices/NoticeTable";
 import NoticeModal from "@/components/notices/NoticeModal";
@@ -14,17 +13,9 @@ export default function ReviewPage() {
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNotice, setSelectedNotice] = useState<BidNotice | null>(null);
+  // 기본은 전체 지역 — 관심 지역 자동 적용은 폐기(2026-09-24)
   const [regionFilter, setRegionFilter] = useState<string[]>([]);
-  const [regionInitialized, setRegionInitialized] = useState(false);
   const queryClient = useQueryClient();
-  const { data: preferredRegions } = useRegionPreference();
-
-  useEffect(() => {
-    if (!regionInitialized && preferredRegions) {
-      setRegionFilter(preferredRegions);
-      setRegionInitialized(true);
-    }
-  }, [preferredRegions, regionInitialized]);
 
   const { data, isLoading } = useNotices({
     page,

@@ -148,7 +148,8 @@ async def list_notices(
     if region:
         region_list = [r.strip() for r in region.split(",") if r.strip()]
         if region_list:
-            conds.append(or_(*[n.c.region.ilike(f"%{r}%") for r in region_list]))
+            # 지역을 모르는 공고(빈 값)는 남긴다 — 알리오·사전규격·직접 추가 사이트는 전부 빈 값이라 빼면 통째로 가려진다
+            conds.append(or_(n.c.region == "", *[n.c.region.ilike(f"%{r}%") for r in region_list]))
 
     total = await db.scalar(select(func.count()).select_from(n).where(*conds)) or 0
 
@@ -265,7 +266,8 @@ async def list_pre_spec_notices(
         region_list = [r.strip() for r in region.split(",") if r.strip()]
         if region_list:
             region_filters = [BidNotice.region.ilike(f"%{r}%") for r in region_list]
-            region_cond = or_(*region_filters)
+            # 지역을 모르는 공고는 남긴다(공고 목록과 같은 규칙) — 사전규격은 지역이 100% 빈 값이다
+            region_cond = or_(func.coalesce(BidNotice.region, "") == "", *region_filters)
             query = query.where(region_cond)
             count_query = count_query.where(region_cond)
 

@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePreSpecNotices } from "@/lib/queries/useNotices";
-import { useRegionPreference } from "@/lib/queries/useRegions";
 import RegionFilter from "@/components/filters/RegionFilter";
 import SourceSelect, { type SourceFilter } from "@/components/filters/SourceSelect";
 import NoticeTable from "@/components/notices/NoticeTable";
@@ -25,19 +24,11 @@ export default function PreNoticesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNotice, setSelectedNotice] = useState<BidNotice | null>(null);
   const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
+  // 기본은 전체 지역 — 관심 지역 자동 적용은 폐기(2026-09-24, 사전규격은 지역이 전부 빈 값이라 통째로 가려졌다)
   const [regionFilter, setRegionFilter] = useState<string[]>([]);
-  const [regionInitialized, setRegionInitialized] = useState(false);
   // 입찰 예고 API는 출처가 사전규격 하나로 고정이라 선택값을 쿼리에 싣지 않는다 — 어느 쪽이든 같은 목록
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>({});
   const queryClient = useQueryClient();
-  const { data: preferredRegions } = useRegionPreference();
-
-  useEffect(() => {
-    if (!regionInitialized && preferredRegions) {
-      setRegionFilter(preferredRegions);
-      setRegionInitialized(true);
-    }
-  }, [preferredRegions, regionInitialized]);
 
   const { data, isLoading } = usePreSpecNotices({
     page,

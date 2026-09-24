@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRegionList, useRegionPreference } from "@/lib/queries/useRegions";
+import { useRegionList } from "@/lib/queries/useRegions";
 
 interface RegionFilterProps {
   selected: string[];

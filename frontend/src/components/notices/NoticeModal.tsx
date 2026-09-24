@@ -188,7 +188,8 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
             <InfoRow label="공고등록일" value={notice.start_date || "—"} />
             <InfoRow label="마감일" value={notice.end_date || "—"} />
             <InfoRow label="예산" value={formatBudget(notice.budget)} />
-            {notice.region && <InfoRow label="지역" value={notice.region} />}
+            {/* 지역을 모르는 공고도 지역 필터에 걸려 나온다 — 빈칸 대신 사실대로 표시 */}
+            <InfoRow label="지역" value={notice.region || "지역 미상"} />
             {notice.category && <InfoRow label="분류" value={notice.category} />}
           </div>
 

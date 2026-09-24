@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNotices } from "@/lib/queries/useNotices";
-import { useRegionPreference } from "@/lib/queries/useRegions";
 import RegionFilter from "@/components/filters/RegionFilter";
 import SourceSelect, { type SourceFilter } from "@/components/filters/SourceSelect";
 import NoticeTable from "@/components/notices/NoticeTable";
@@ -25,19 +24,10 @@ export default function NoticesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNotice, setSelectedNotice] = useState<BidNotice | null>(null);
   const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
+  // 기본은 전체 지역 — 관심 지역 자동 적용은 폐기(2026-09-24, 지역 없는 출처가 통째로 가려졌다)
   const [regionFilter, setRegionFilter] = useState<string[]>([]);
-  const [regionInitialized, setRegionInitialized] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>({});
   const queryClient = useQueryClient();
-  const { data: preferredRegions } = useRegionPreference();
-
-  // 설정의 관심 지역을 기본 필터로 자동 적용 (최초 1회)
-  useEffect(() => {
-    if (!regionInitialized && preferredRegions) {
-      setRegionFilter(preferredRegions);
-      setRegionInitialized(true);
-    }
-  }, [preferredRegions, regionInitialized]);
 
   const { data, isLoading } = useNotices({
     page,
