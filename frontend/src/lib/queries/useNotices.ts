@@ -7,6 +7,7 @@ interface NoticeParams {
   page_size?: number;
   q?: string;
   source_id?: number;
+  scraper_id?: number;
   status?: string;
   tag?: string;
   region?: string;
@@ -23,7 +24,7 @@ export function useNotices(params: NoticeParams = {}) {
   });
 }
 
-export function usePreSpecNotices(params: Omit<NoticeParams, "source_id"> = {}) {
+export function usePreSpecNotices(params: Omit<NoticeParams, "source_id" | "scraper_id"> = {}) {
   return useQuery<NoticeListResponse>({
     queryKey: ["pre-spec-notices", params],
     queryFn: async () => {

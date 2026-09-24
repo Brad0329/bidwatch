@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNotices } from "@/lib/queries/useNotices";
 import { useRegionPreference } from "@/lib/queries/useRegions";
 import RegionFilter from "@/components/filters/RegionFilter";
+import SourceSelect, { type SourceFilter } from "@/components/filters/SourceSelect";
 import NoticeTable from "@/components/notices/NoticeTable";
 import NoticeModal from "@/components/notices/NoticeModal";
 import type { BidNotice } from "@/types";
@@ -26,6 +27,7 @@ export default function NoticesPage() {
   const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
   const [regionFilter, setRegionFilter] = useState<string[]>([]);
   const [regionInitialized, setRegionInitialized] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>({});
   const queryClient = useQueryClient();
   const { data: preferredRegions } = useRegionPreference();
 
@@ -43,6 +45,7 @@ export default function NoticesPage() {
     q: searchQuery || undefined,
     tag: tagFilter,
     region: regionFilter.length > 0 ? regionFilter.join(",") : undefined,
+    ...sourceFilter,
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -86,6 +89,13 @@ export default function NoticesPage() {
         {/* 검색 + 태그 필터 */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6">
           <form onSubmit={handleSearch} className="px-6 py-4 flex gap-3">
+            <SourceSelect
+              value={sourceFilter}
+              onChange={(f) => {
+                setSourceFilter(f);
+                setPage(1);
+              }}
+            />
             <div className="flex-1 relative">
               <i className="ri-search-line absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
               <input
