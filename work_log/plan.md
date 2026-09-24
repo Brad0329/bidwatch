@@ -36,6 +36,12 @@
   - 수집 이력의 "절단(max_pages)"과 "장애" 구분: bid-collectors v1.1은 둘 다 `is_partial`+errors이고 문구는 계약이 아니다
     → 지금은 "errors 있고 0건 = 장애(error)", "notices 있고 partial = 일부 수집"으로만 나눈다. 알림에서 둘을 가르려면
     bid-collectors에 구분 필드(예: `truncated`)를 요청한다. GenericScraper 기본 max_pages=3이라 절단이 잦을 수 있다.
+  - bid-collectors v1.2.4(2026-09-25)부터 errors가 두 종류 더 나온다: API 수집기 "항목 파싱 예외로 N건 건너뜀"(나머지는 반환),
+    GenericScraper "셀렉터 불일치 의심 — 목록 행 R개 중 추출 0건". 후자는 **정기 수집의 유일한 사이트 개편 감지 수단**
+    (날짜 파싱 50% 미만 탈락은 시험 수집에만 있다) → 수집 이력에서 그 사이트를 "설정 재생성 필요"로 띄울지 착수 시 정한다.
+    분기는 문구가 아니라 `is_partial`·`len(errors)`로(문구는 계약 아님). 지금 bidwatch는 수집 0건+errors를 error로만 처리한다.
+  - 정기 수집을 붙이면 기준선 대조: GenericScraper는 기준일 이내 0건 페이지에서 멈추고 기업마당은 "마지막 3건 전부 오래됨"에서
+    멈춘다 — 공고일 순이 아닌 게시판은 뒤 페이지를 errors 없이 놓친다. 사이트 화면 건수보다 적은 곳은 bid-collectors에 알린다.
 - [ ] Phase 010: 대시보드 (F-012) — **서비스 오픈 직전에 한다**(2026-09-24 사용자 결정: 종전 009였으나 오픈 전까지 불필요)
   - 착수 전 F-012 수용 기준 확정(무엇을 "신규"로 셀지·마감 임박 기준일 수 등 모호점 질문)
   - 신규 공고 수, 키워드 매칭 수, 마감 임박, 출처별 수집 현황 카드
@@ -146,5 +152,11 @@
   한국디자인진흥원(타임아웃) — 사이트 장애, 살아나면 `import_builtin_sites.py --retry-failed`(AI 과금). 정기 수집(Phase 009)이
   생기면 기본 제공 35곳과 공공 출처 `alio`도 그 대상이다 — 지금은 등록 시 첫 수집 1회뿐.
   (4번째였던 "신용보증기금"은 알리오 전체 게시판이었다 — 스크립트 EXCLUDED로 빼고 공공 출처 `alio`로 해결, 2026-09-24)
+- **URL 수집 공고의 진행중/마감이 게시일로 정해진다** (2026-09-25 실측, `scripts/_tmp/status_check.py`) — GenericScraper가
+  status를 마감일이 아니라 게시일로 판정한다(bid-collectors 알림). scraped_notices 883건 중 end_date 있는 행 **0건**,
+  status closed 265 / ongoing 371 / NULL 247, 최근 7일 게시인데 closed 53건. bidwatch가 쓰는 곳: 공고 상세 모달의
+  진행중/마감 배지(`NoticeModal.tsx:132`) + 목록 API `status` 필터(`notices.py:133`, 화면에서 넘기는 곳은 없음).
+  → 어젯밤 올라온 공고가 상세에서 "마감"으로 보인다. 선택지: ① bid-collectors가 판정을 바꾼다(계약 변경 — 소비자 값이 바뀜)
+  ② bidwatch가 URL 출처 status를 무시하고 배지를 숨긴다. 결정 대기.
 - **분석 중 서버 재시작 시 status가 analyzing에 남음** — BackgroundTasks는 프로세스와 함께 사라진다. 지금은 같은 URL을
   다시 제출해도 재분석하지 않는다(failed만 재분석). 기동 시 오래된 analyzing을 pending/failed로 되돌리는 복구가 필요.
