@@ -130,7 +130,7 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
   const applyUrl = text(ex.apply_url) ?? text(ex.rceptEngnHmpgUrl);
   const stdDocUrl = text(ex.stdNtceDocUrl);
   // 알리오 상세의 원문 링크(refrUrl) — 있으면 원문이 주 버튼, 알리오 게시물은 보조 버튼
-  const originUrl = text(ex.refrUrl);
+  const originUrl = originHref(text(ex.refrUrl));
 
   return (
     <>
@@ -530,6 +530,23 @@ const ORIGIN_SITES: [string, string][] = [
   ["lh.or.kr", "LH 전자조달"],
   ["khnp.co.kr", "한수원 전자입찰"],
 ];
+
+/* 알리오 refrUrl 원문 → 링크 주소. 원문 전달 원칙이라 보정은 표시 쪽 몫(bid-collectors institution_sources.md §5 실측):
+   LH는 "https://" 없이 오고, 가스공사는 "&amp;amp;"처럼 이중 이스케이프로 온다. http(s)가 아니면 버튼을 숨긴다 */
+function originHref(raw: string | null): string | null {
+  if (!raw) return null;
+  let s = raw;
+  while (s.includes("&amp;")) s = s.replace(/&amp;/g, "&");
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) s = "https://" + s.replace(/^\/+/, "");
+  try {
+    const u = new URL(s);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.href;
+  } catch {
+    // 아래 경고로 넘어간다
+  }
+  console.warn("알리오 원문 링크를 주소로 못 읽어 버튼을 숨김:", raw);
+  return null;
+}
 
 function originSiteName(url: string): string | null {
   let host: string;
