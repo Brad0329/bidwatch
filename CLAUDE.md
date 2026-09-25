@@ -173,7 +173,8 @@ FastAPI + PostgreSQL 백엔드, Next.js 프론트엔드로 만드는 구독형 �
   frontend/src/         ← Next.js App Router (app / components / lib / stores / types)
   prototype/            ← 초기 HTML 프로토타입 (참고용, 신규 작업 대상 아님)
   tests/                ← 동봉 파이썬 도구(훅·측정기) 테스트
-  docs/                 ← REQUIREMENTS.md, SCHEMA.md, system_design.md, api_spec.md, interface.md, playbooks/
+  docs/                 ← REQUIREMENTS.md, SCHEMA.md, system_design.md, api_spec.md, interface.md,
+                           source_fields.md(출처별 표준 필드 원천·extra 키 의미), playbooks/
   work_log/             ← plan.md, Phase_XXX.md
   scripts/              ← 동봉 측정·점검 스크립트
   ```

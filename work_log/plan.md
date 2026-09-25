@@ -160,5 +160,7 @@
   → 어젯밤 올라온 공고가 상세에서 "마감"으로 보인다. **2026-09-25 사용자 결정 ②: URL 출처 공고는 상세 배지를 숨긴다**
   (bid-collectors 계약은 그대로). 목록 API `status` 필터는 URL 출처에 여전히 게시일 기준 값으로 걸린다 — 화면이 이 필터를
   쓰게 되면 URL 출처를 필터에서 빼야 한다.
+- **bid-collectors 결함·불일치 10건 (2026-09-25 필드 사전 조사, `docs/source_fields.md` 부록 A)** — bid-collectors에 전달 대기.
+  BidWatch에 닿는 것: 공사 budget=추정가격(A-5), region 원천이 기관명(A-6), K-Startup organization 폴백이 기관 유형(A-7), cancelled 미생성(A-8).
 - **분석 중 서버 재시작 시 status가 analyzing에 남음** — BackgroundTasks는 프로세스와 함께 사라진다. 지금은 같은 URL을
   다시 제출해도 재분석하지 않는다(failed만 재분석). 기동 시 오래된 analyzing을 pending/failed로 되돌리는 복구가 필요.
