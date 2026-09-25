@@ -175,6 +175,8 @@
 - **수용 기준**:
   - [x] 표기 변형이 17개 짧은 이름으로 정규화된다 → `test_normalize_region`
   - [x] "경기도 광주시"는 경기로 분류된다 → `test_gwangju_is_not_confused_with_gyeonggi`
+  - [x] "전남광주통합특별시"(나라장터 원문의 통합 행정구역)는 광주 구 소재여도 전남으로 분류된다 (2026-09-25 사용자 결정)
+    → `test_jeonnam_gwangju_unified_city_is_jeonnam`
   - [x] 별칭 표의 모든 값이 17개 지역 중 하나로 간다 → `test_all_aliases_normalize_into_known_regions`
   - [x] `region=서울,부산`이면 서울·부산 공고와 **지역 빈 공고**가 나오고 다른 지역 공고는 안 나온다 — 공고 목록·입찰 예고
     → `test_region_filter_keeps_unknown_region` · `test_prespec_region_filter_keeps_unknown_region`
@@ -200,8 +202,8 @@
   - [x] 취소 차수보다 **높은** 차수(취소 뒤 재공고)는 `cancelled`가 되지 않는다 → 같은 테스트
   - [x] 같은 공고번호에 더 높은 차수 행이 있으면 `superseded=true`, 가장 높은 차수는 `false` — 자릿수가 달라도 정수로 → `test_superseded_marks_earlier_revisions`
   - [x] 재수집으로 이전 차수 행이 다시 upsert돼도 취소·이전 차수 표시가 유지된다 → `test_recollect_keeps_revision_flags`
-  - [x] 공고 목록(`/api/notices`)은 태그 필터가 없으면 이전 차수·취소 행을 빼고, `total`도 뺀 건수다. `status=cancelled`를 고르면 취소 공고가 나온다(API만 — 화면에 상태 선택은 없다. 사용자 결정 "목록 기본 숨김"이라
-    태그 없는 취소 공고는 화면에서 볼 수 없다) → `test_list_shows_latest_revision_only`
+  - [x] 공고 목록(`/api/notices`)은 태그 필터가 없으면 이전 차수·취소 행을 빼고, `total`도 뺀 건수다. `status=cancelled`를 고르면 취소 공고가 나온다(API만 — 화면에 상태 선택은 없다. 태그 없는 취소 공고는 화면에서 볼 수 없다.
+    취소 전용 화면은 **안 함** — 2026-09-25 사용자 결정 "일단 그대로") → `test_list_shows_latest_revision_only`
   - [x] 태그 필터가 있으면(검토요청 화면 등) 취소·이전 차수 행도 나온다 → 같은 테스트
   - [x] 새 차수가 오면 이전 차수의 태그가 최신 차수로 옮겨가고, 최신 차수에 이미 태그가 있으면 옮기지 않는다 → `test_tag_moves_to_latest_revision`
   - [ ] 목록(검토요청 등 태그 화면)·상세에서 취소 공고는 "취소" 배지로 보인다 (사용자 실테스트)

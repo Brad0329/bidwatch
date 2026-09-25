@@ -174,8 +174,7 @@
 - **bid-collectors 결함·불일치 10건 (2026-09-25 필드 사전 조사, `docs/source_fields.md` 부록 A)** — bid-collectors에 전달 대기.
   BidWatch에 닿는 것: 공사 budget=추정가격(A-5), region 원천이 기관명(A-6 — 공사는 BidWatch가 현장 지역으로 해결), K-Startup organization
   폴백이 기관 유형(A-7), cancelled 미생성(A-8 — BidWatch가 원문으로 해결, F-017).
-- **"전남광주통합특별시" — 지역 17개 표가 행정구역 변경을 모른다 (2026-09-25 공사현장 지역 소급 중 발견)**: 나라장터 원문에 이 이름이
-  나온다(공사현장·가산지역). `normalize_region`은 접두어 "전남"으로 **전부 전남**에 넣는다 — 광주 구(동·서·남·북·광산구) 현장 공사도 전남이
-  되고, 공사 지역 분포에 광주가 0건이다. 지역 목록(17개)을 바꿀지·광주 구를 광주로 볼지는 수집 시점 정규화(일반 트랙) — 사용자 결정 대기.
+- ~~"전남광주통합특별시" 지역 분류~~ — **닫음(2026-09-25 사용자 결정: 전남으로 본다, 광주 구 소재 포함)**. 별칭 표에 정식 등록해
+  기관명 중간에 있어도 전남(`test_jeonnam_gwangju_unified_city_is_jeonnam`). 17개 지역 목록은 그대로, 소급 대상 0건.
 - **분석 중 서버 재시작 시 status가 analyzing에 남음** — BackgroundTasks는 프로세스와 함께 사라진다. 지금은 같은 URL을
   다시 제출해도 재분석하지 않는다(failed만 재분석). 기동 시 오래된 analyzing을 pending/failed로 되돌리는 복구가 필요.

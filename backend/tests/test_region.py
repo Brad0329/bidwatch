@@ -42,6 +42,13 @@ def test_gwangju_is_not_confused_with_gyeonggi():
     assert normalize_region("광주광역시") == "광주"
 
 
+def test_jeonnam_gwangju_unified_city_is_jeonnam():
+    """전남광주통합특별시는 광주 구 소재여도 전남 (2026-09-25 사용자 결정) — 기관명 중간에 있어도."""
+    assert normalize_region("전남광주통합특별시 북구") == "전남"
+    assert normalize_region("전남광주통합특별시") == "전남"
+    assert normalize_region("재단법인 전남광주통합특별시 문화재단") == "전남"
+
+
 def test_normalize_strips_whitespace():
     assert normalize_region("  전라남도 순천시  ") == "전남"
 
