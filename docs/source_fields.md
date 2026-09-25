@@ -425,6 +425,13 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 | rnum | (표시 없음) | 목록 순번. **새 공고가 오면 값이 밀린다 — 공고 속성이 아님** | int | 440 | 추정 |
 | logo / imgPathNo | (이미지) | 기관 로고 파일명 / 로고 경로 번호 | `국립공원공단 ci.jpg` | 420 | 화면(`alioUtils.js getImgPath`) |
 
+### C-2. 상세 조회로 더해지는 키 (bid-collectors v1.3.0 `fetch_detail`, BidWatch가 팝업을 열 때 1회 병합)
+- `attachments`(첨부 `fileList` → `{name,url}`)와 상세 `data.bidDtl`의 비어 있지 않은 필드 전부. 화면이 쓰는 것:
+  `refrUrl` = **원문 링크**(나라장터 `g2b.go.kr`의 `bidPbancNo`=나라장터 공고번호 · 온비드 `onbid.co.kr` · 한전 SRM · 수자원 · LH · 한수원).
+- 그 밖(뜻은 이름·값 추정, 공식 명세 없음): `bidType`(1=나라장터 연계로 보임, 3=기관 자체 전자입찰로 보임) · `apbaId`(기관 코드) ·
+  `ingStatus` · `totContAmt`(표본 전부 0) · `disclosureNo`·`submissionNo`(공시 번호) · `idate`·`frstRegiDt`(=`bdate`) · `bFiles`(첨부 중복 문자열).
+- 본문 `content`는 실측 0/50건 — 알리오는 본문을 주지 않는다.
+
 ### D. 표본·재현
 2026-09-25 `collect(days=2)` 440건 46페이지, errors 0. bdate는 09-23에 몰려 있었다(등록이 하루 이상 늦게 반영되는 것으로 보임, 1회 관찰).
 재현: `scripts/_tmp/fielddict_alio.py 2`.

@@ -129,6 +129,8 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
   // K-Startup 상세 보충의 apply_url, 없으면 기업마당 사업신청URL
   const applyUrl = text(ex.apply_url) ?? text(ex.rceptEngnHmpgUrl);
   const stdDocUrl = text(ex.stdNtceDocUrl);
+  // 알리오 상세의 원문 링크(refrUrl) — 있으면 원문이 주 버튼, 알리오 게시물은 보조 버튼
+  const originUrl = text(ex.refrUrl);
 
   return (
     <>
@@ -256,6 +258,31 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
             </div>
           )}
 
+          {/* 연결된 공고 — 사전규격 ↔ 본 공고(F-018), 알리오 → 나라장터 */}
+          {(notice.related || []).length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">연결된 공고</h3>
+              <div className="space-y-1.5">
+                {notice.related!.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => openLinked(r.id)}
+                    disabled={linkLoading}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors group text-left disabled:opacity-50"
+                  >
+                    <span className="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded shrink-0">
+                      {r.kind === "prespec" ? "사전규격 보기" : r.kind === "nara" ? "나라장터 공고 보기" : "본 공고 보기"}
+                    </span>
+                    <span className="text-sm text-gray-700 group-hover:text-blue-600 truncate">{r.title}</span>
+                    {r.status === "cancelled" && (
+                      <span className="text-xs font-semibold bg-red-50 text-red-700 px-2 py-0.5 rounded shrink-0">취소</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 첨부파일 */}
           {notice.attachments && notice.attachments.length > 0 && (
             <div>
@@ -283,42 +310,32 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
             </div>
           )}
 
-          {/* 사전규격 ↔ 본 공고 (F-018) */}
-          {(notice.related || []).length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">연결된 공고</h3>
-              <div className="space-y-1.5">
-                {notice.related!.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => openLinked(r.id)}
-                    disabled={linkLoading}
-                    className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors group text-left disabled:opacity-50"
-                  >
-                    <span className="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded shrink-0">
-                      {r.kind === "prespec" ? "사전규격 보기" : "본 공고 보기"}
-                    </span>
-                    <span className="text-sm text-gray-700 group-hover:text-blue-600 truncate">{r.title}</span>
-                    {r.status === "cancelled" && (
-                      <span className="text-xs font-semibold bg-red-50 text-red-700 px-2 py-0.5 rounded shrink-0">취소</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* 링크 버튼 */}
           <div className="flex gap-3 pt-2">
-            {notice.url && (
+            {originUrl && (
               <a
-                href={notice.url}
+                href={originUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 <i className="ri-external-link-line"></i>
-                공고 사이트 바로가기
+                원문 바로가기{originSiteName(originUrl) ? ` (${originSiteName(originUrl)})` : ""}
+              </a>
+            )}
+            {notice.url && (
+              <a
+                href={notice.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  originUrl
+                    ? "border border-gray-200 hover:bg-gray-50 text-gray-700"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
+              >
+                <i className={originUrl ? "ri-file-text-line" : "ri-external-link-line"}></i>
+                {originUrl ? "알리오 공고" : "공고 사이트 바로가기"}
               </a>
             )}
             {applyUrl && (
@@ -502,6 +519,26 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <div className="text-sm text-gray-900 mt-0.5">{value}</div>
     </div>
   );
+}
+
+/* 알리오 원문 링크 도메인 → 버튼에 붙일 사이트 이름 (실측 2026-09-25: 나라장터·온비드·한전·수자원·LH·한수원) */
+const ORIGIN_SITES: [string, string][] = [
+  ["g2b.go.kr", "나라장터"],
+  ["onbid.co.kr", "온비드"],
+  ["srm.kepco.net", "한전 전자입찰"],
+  ["kwater.or.kr", "수자원공사 전자입찰"],
+  ["lh.or.kr", "LH 전자조달"],
+  ["khnp.co.kr", "한수원 전자입찰"],
+];
+
+function originSiteName(url: string): string | null {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return null; // 주소 형식이 아니면 이름 없이 "원문 바로가기"만
+  }
+  return ORIGIN_SITES.find(([domain]) => host.endsWith(domain))?.[1] ?? null;
 }
 
 /* 나라장터 금액은 문자열("456714000")로 온다 */

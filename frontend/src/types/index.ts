@@ -92,7 +92,7 @@ export interface BidNotice {
 
 export interface RelatedNotice {
   id: number;
-  kind: "prespec" | "notice";
+  kind: "prespec" | "notice" | "nara"; // nara = 알리오 → 같은 나라장터 공고
   bid_no: string;
   title: string;
   status: string;

@@ -4,7 +4,8 @@ from pydantic import BaseModel
 
 
 class RelatedNotice(BaseModel):
-    """상세에서 이어지는 공고 (F-018). kind: "prespec"(본 공고 → 사전규격) | "notice"(사전규격 → 본 공고)."""
+    """상세에서 이어지는 공고 (F-018). kind: "prespec"(본 공고 → 사전규격) | "notice"(사전규격 → 본 공고)
+    | "nara"(알리오 → 같은 나라장터 공고, 원문 링크의 공고번호로)."""
     id: int
     kind: str
     bid_no: str
