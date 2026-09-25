@@ -69,7 +69,7 @@ export default function NoticesPage() {
   return (
     <div>
       <header className="bg-white border-b border-gray-200 px-8 py-4">
-        <h1 className="text-xl font-bold text-gray-900">공고 목록</h1>
+        <h1 className="text-xl font-bold text-gray-900">입찰(지원사업) 공고</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           {data ? `총 ${data.total}건` : "로딩 중..."}
         </p>
