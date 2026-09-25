@@ -108,7 +108,7 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
   };
 
   const dday = getDday(notice.end_date);
-  const ex = (notice.extra || {}) as Record<string, string | number | null>;
+  const ex: Extra = notice.extra || {};
   const isNara = notice.source_name === "나라장터";
 
   return (
@@ -199,7 +199,7 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
           {/* 출처별 상세 필드 */}
           {isNara ? (
             /* 나라장터 전용 */
-            <NaraExtra ex={ex} />
+            <NaraExtra ex={ex} bidNo={notice.bid_no} />
           ) : (
             /* K-Startup / 기업마당 / 중소벤처기업부 등 */
             <GeneralExtra ex={ex} />
@@ -272,9 +272,9 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
                 공고 사이트 바로가기
               </a>
             )}
-            {ex.apply_url && (
+            {text(ex.apply_url) && (
               <a
-                href={String(ex.apply_url)}
+                href={text(ex.apply_url)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
@@ -301,76 +301,110 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
   );
 }
 
-/* 나라장터 전용 상세 필드 */
-/* 실제 DB extra 키: bid_method, bid_type, budget, contract_method, award_method,
-   contact, contact_email, est_price, open_date, tech_eval_ratio, price_eval_ratio, bid_qual */
-function NaraExtra({ ex }: { ex: Record<string, string | number | null> }) {
-  const hasAny =
-    ex.est_price || ex.bid_method || ex.bid_type || ex.open_date ||
-    ex.contract_method || ex.award_method || ex.contact ||
-    ex.tech_eval_ratio || ex.price_eval_ratio || ex.bid_qual;
+/* extra = 출처 응답 원문 전부, 원래 키 이름 그대로 (bid-collectors v1.2.5).
+   키의 뜻·출현 빈도는 docs/source_fields.md. 값은 str만이 아니라 int·list·dict일 수 있다. */
+type Extra = Record<string, unknown>;
+type Row = [label: string, value: string | null];
 
-  if (!hasAny) return null;
+/* 원문 값 → 표시 문자열. 빈 값은 null (행을 숨긴다) */
+function text(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  if (Array.isArray(v)) return v.map(text).filter(Boolean).join(", ") || null;
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v).trim() || null;
+}
 
-  // 기술:가격 평가비율을 한 줄로 표시
-  const evalRatio =
-    ex.tech_eval_ratio && ex.price_eval_ratio
-      ? `기술 ${ex.tech_eval_ratio}% : 가격 ${ex.price_eval_ratio}%`
-      : ex.tech_eval_ratio
-        ? `기술 ${ex.tech_eval_ratio}%`
-        : ex.price_eval_ratio
-          ? `가격 ${ex.price_eval_ratio}%`
-          : null;
+/* HTML 태그·엔티티 제거 — K-Startup·기업마당 원문에는 HTML과 엔티티가 그대로 온다.
+   엔티티로 감싼 태그(&lt;p&gt;)도 있어 두 번 푼다 */
+function plain(v: unknown): string | null {
+  let s = text(v);
+  if (!s) return null;
+  if (typeof window !== "undefined") {
+    for (let i = 0; i < 2; i++) {
+      s = new DOMParser().parseFromString(s, "text/html").body.textContent ?? "";
+    }
+  } else {
+    s = s.replace(/<[^>]*>/g, " ");
+  }
+  return s.replace(/\s+/g, " ").trim() || null;
+}
 
+function first(ex: Extra, ...keys: string[]): string | null {
+  for (const k of keys) {
+    const v = text(ex[k]);
+    if (v) return v;
+  }
+  return null;
+}
+
+function ExtraSection({ title, rows }: { title: string; rows: Row[] }) {
+  const shown = rows.filter((r): r is [string, string] => !!r[1]);
+  // 옛 형식(영어 키) 행은 여기 키가 하나도 없다 — 재수집 전까지 섹션을 숨긴다
+  if (shown.length === 0) return null;
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-2">나라장터 상세</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-2">{title}</h3>
       <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-        {ex.est_price && <InfoRow label="추정 가격" value={formatPrice(ex.est_price)} />}
-        {ex.budget && <InfoRow label="배정 예산" value={formatPrice(ex.budget)} />}
-        {ex.bid_type && <InfoRow label="입찰 구분" value={String(ex.bid_type)} />}
-        {ex.bid_method && <InfoRow label="입찰 방식" value={String(ex.bid_method)} />}
-        {ex.contract_method && <InfoRow label="계약 방식" value={String(ex.contract_method)} />}
-        {ex.award_method && <InfoRow label="낙찰 방식" value={String(ex.award_method)} />}
-        {evalRatio && <InfoRow label="평가 비율" value={evalRatio} />}
-        {ex.open_date && <InfoRow label="개찰 일시" value={String(ex.open_date)} />}
-        {ex.bid_qual && <InfoRow label="입찰자격 등록일" value={String(ex.bid_qual)} />}
-        {ex.contact && <InfoRow label="담당자" value={String(ex.contact)} />}
-        {ex.contact_email && <InfoRow label="담당자 이메일" value={String(ex.contact_email)} />}
+        {shown.map(([label, value]) => (
+          <InfoRow key={label} label={label} value={value} />
+        ))}
       </div>
     </div>
   );
 }
 
-/* K-Startup / 기업마당 등 상세 필드 */
-/* K-Startup 실제 키: apply_method, biz_name, biz_year, contact, department, excl_target, target, target_age */
-/* 기업마당 실제 키: hashtags, reference, req_method, sub_category, target, view_count */
-function GeneralExtra({ ex }: { ex: Record<string, string | number | null> }) {
-  const hasAny = ex.biz_name || ex.target || ex.target_age || ex.biz_year ||
-    ex.excl_target || ex.apply_method || ex.department || ex.contact ||
-    ex.req_method || ex.sub_category || ex.hashtags || ex.reference;
+/* 나라장터 입찰공고 (용역·물품·공사) — 조달청 입찰공고정보서비스 원문 키 */
+function NaraExtra({ ex, bidNo }: { ex: Extra; bidNo: string }) {
+  const tech = text(ex.techAbltEvlRt);
+  const price = text(ex.bidPrceEvlRt);
+  const evalRatio =
+    tech && price ? `기술 ${tech}% : 가격 ${price}%`
+      : tech ? `기술 ${tech}%`
+        : price ? `가격 ${price}%`
+          : null;
+  const officer = [text(ex.ntceInsttOfclNm), text(ex.ntceInsttOfclTelNo)].filter(Boolean).join(" ");
 
-  if (!hasAny) return null;
+  const rows: Row[] = [
+    ["추정 가격", formatPrice(ex.presmptPrce)],
+    // 공사는 배정예산 태그가 없고 예산금액(bdgtAmt)으로 온다
+    ["배정 예산", formatPrice(ex.asignBdgtAmt ?? ex.bdgtAmt)],
+    ["입찰 방식", text(ex.bidMethdNm)],
+    ["계약 방식", text(ex.cntrctCnclsMthdNm)],
+    ["낙찰 방식", text(ex.sucsfbidMthdNm)],
+    ["평가 비율", evalRatio],
+    ["개찰 일시", text(ex.opengDt)],
+    ["참가자격 등록 마감", text(ex.bidQlfctRgstDt)],
+    ["담당자", officer || null],
+    // 용역은 공고기관 담당자 이메일이 늘 비어 온다(source_fields.md §2)
+    ["담당자 이메일", text(ex.ntceInsttOfclEmailAdrs)],
+  ];
+  if (rows.every(([, v]) => !v)) return null;
 
-  return (
-    <div>
-      <h3 className="text-sm font-semibold text-gray-700 mb-2">상세 정보</h3>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-        {ex.biz_name && <InfoRow label="사업명" value={String(ex.biz_name)} />}
-        {ex.target && <InfoRow label="지원 대상" value={String(ex.target)} />}
-        {ex.target_age && <InfoRow label="대상 연령" value={String(ex.target_age)} />}
-        {ex.biz_year && <InfoRow label="창업 연차" value={String(ex.biz_year)} />}
-        {ex.excl_target && <InfoRow label="제외 대상" value={String(ex.excl_target)} />}
-        {ex.apply_method && <InfoRow label="접수 방법" value={String(ex.apply_method)} />}
-        {ex.req_method && <InfoRow label="접수 방법" value={String(ex.req_method)} />}
-        {ex.department && <InfoRow label="담당부서" value={String(ex.department)} />}
-        {ex.contact && <InfoRow label="문의처" value={String(ex.contact)} />}
-        {ex.sub_category && <InfoRow label="세부 분류" value={String(ex.sub_category)} />}
-        {ex.hashtags && <InfoRow label="태그" value={String(ex.hashtags)} />}
-        {ex.reference && <InfoRow label="참고" value={String(ex.reference)} />}
-      </div>
-    </div>
-  );
+  // 용역/물품/공사는 응답에 없고 bid_no 접두사에만 있다
+  const bidType = bidNo.split("-")[0];
+  if (["용역", "물품", "공사"].includes(bidType)) rows.unshift(["입찰 구분", bidType]);
+
+  return <ExtraSection title="나라장터 상세" rows={rows} />;
+}
+
+/* K-Startup / 기업마당 — 출처끼리 키가 겹치지 않아 한 목록으로 둔다 */
+function GeneralExtra({ ex }: { ex: Extra }) {
+  const rows: Row[] = [
+    ["사업명", plain(ex.intg_pbanc_biz_nm)],
+    ["지원 대상", plain(ex.aply_trgt_ctnt) ?? plain(ex.trgetNm)],
+    ["대상 연령", text(ex.biz_trgt_age)],
+    ["창업 기간", text(ex.biz_enyy)],
+    ["제외 대상", plain(ex.aply_excl_trgt_ctnt)],
+    ["접수 방법",
+      plain(first(ex, "aply_mthd_onli_rcpt_istc", "aply_mthd_vst_rcpt_istc", "aply_mthd_etc_istc"))
+      ?? plain(ex.reqstMthPapersCn)],
+    ["담당부서", plain(ex.biz_prch_dprt_nm)],
+    ["문의처", text(ex.prch_cnpl_no)],
+    ["세부 분류", text(ex.pldirSportRealmMlsfcCodeNm)],
+    ["태그", text(ex.hashtags)],
+    ["참고", plain(ex.refrncNm)],
+  ];
+  return <ExtraSection title="상세 정보" rows={rows} />;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -382,9 +416,11 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatPrice(value: string | number | null): string {
-  if (!value) return "—";
-  const num = typeof value === "string" ? parseInt(value.replace(/[^0-9]/g, ""), 10) : value;
-  if (isNaN(num)) return String(value);
-  return num.toLocaleString() + "원";
+/* 나라장터 금액은 문자열("456714000")로 온다 */
+function formatPrice(value: unknown): string | null {
+  const s = text(value);
+  if (!s) return null;
+  const num = Number(s.replace(/[^0-9.]/g, ""));
+  if (!s.match(/\d/) || isNaN(num)) return s;
+  return Math.round(num).toLocaleString() + "원";
 }

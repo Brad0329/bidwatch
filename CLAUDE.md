@@ -185,7 +185,8 @@ FastAPI + PostgreSQL 백엔드, Next.js 프론트엔드로 만드는 구독형 �
   프론트는 페이지 `app/(app)/<경로>/page.tsx` + 서버 상태는 `lib/queries/use<도메인>.ts`.
 - **같은 규칙이 두 곳 이상에 구현되면** 그 사실을 여기 적고, **두 구현을 대조하는 테스트를 반드시 만든다.**
   현재: 지역 17개 목록(백엔드 `services/region.py` 상수 ↔ 프론트는 API로 받음 — 이중 구현 아님).
-  `docs/interface.md`는 bid-collectors 저장소와 **같은 문서가 두 곳**에 있다 — 고치면 양쪽 다.
+  `docs/interface.md`는 bid-collectors 저장소와 **같은 문서가 두 곳**에 있다 — 변경은 bid-collectors가 하고
+  `bid-collectors/docs/handover/v<버전>.md`로 넘긴다. bidwatch는 받은 파일로 통째 교체 후 `cmp`로 동일 확인, handover §5를 채운다(2026-09-25).
 
 ## 테스트 규칙
 - 백엔드: `backend/.venv/Scripts/python.exe -m pytest backend/tests` (저장소 루트에서, 약 7초)
