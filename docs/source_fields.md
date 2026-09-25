@@ -241,7 +241,7 @@ attachments = `specDocFileUrl1~5`(이름 필드가 없어서 `규격서{i}`로 �
 - **낙찰** — `ScsbidInfoService` data.go.kr **15129397**. extra 19키, 전부 명세로 확인. 핵심: `bidwinnrNm`·`bidwinnrBizno`(최종낙찰업체), `sucsfbidAmt`(최종낙찰금액), `sucsfbidRate`(낙찰금액÷예정가격×100), `prtcptCnum`(참가업체수), `rlOpengDt`(실개찰일시), `fnlSucsfDate`.
   **조회 기준이 공고게시일시**라서 `days=N`은 "최근 N일 낙찰"이 아니라 "최근 N일에 게시된 공고 중 이미 낙찰된 것"이다(표본 27건이 모두 참가 1곳짜리였다).
 - **계약** — `CntrctInfoService` data.go.kr **15129427**. extra 45키, 전부 명세로 확인(공공조달 대·중분류명의 표기는 입찰공고와 같은 문제). 핵심: `untyCntrctNo`(통합계약번호), `dcsnCntrctNo`(확정계약번호. **끝 2자리가 수정차수**라 계약이 변경되면 새 bid_no가 된다), `thtmCntrctAmt`(이번 차수 금액)와 `totCntrctAmt`(장기계속 전체 금액), `corpList`·`dminsttList`(`^`로 구분한 목록 문자열), `cntrctPrd`(**자유 형식 문장**).
-  `cntrctCnclsDate`(체결일자)와 `cntrctDate`(계약일자)의 차이는 명세에 설명이 없다. 공사 전용 키(`cnstwkNm`·`cbgnDate` 등)는 결함 때문에 현재 도달하지 않는다(부록 A-1).
+  `cntrctCnclsDate`(체결일자)와 `cntrctDate`(계약일자)의 차이는 명세에 설명이 없다. 공사 계약은 제목이 `cnstwkNm`으로 온다 — v1.3.0까지는 결함으로 전건 건너뛰어졌고 **v1.3.1에서 해소**(부록 A-1, 실측 1일 0 → 61~62건).
 
 ---
 
@@ -451,16 +451,18 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 
 | # | 내용 | 영향 | BidWatch 영향 |
 |---|---|---|---|
-| 1 | 계약 공사: 응답의 제목이 `cnstwkNm`인데 수집기가 `cntrctNm`을 필수로 요구 → **공사 100/100건이 건너뛰어짐**(경고 로그만 남음) | 계약 공사 수집 0건 | 없음(미사용) |
+| 1 | ~~계약 공사: 응답의 제목이 `cnstwkNm`인데 수집기가 `cntrctNm`을 필수로 요구 → 공사 100/100건이 건너뛰어짐~~ **v1.3.1에서 해소**(제목 `cntrctNm` → 없으면 `cnstwkNm`) | 계약 공사 수집 0건 | 없음(미사용) |
 | 2 | `parse_date`가 기간 문자열에서 **시작일**을 돌려줘서 end_date가 틀림 — 계약 `cntrctPrd`, 보조금24 `신청기한`(보조금24는 bid-collectors plan.md에 이미 보류 등록) | 접수 중인 건이 closed로 판정됨 | 보조금24(현재 화면에서 숨김) |
-| 3 | 나라장터 입찰 첨부 루프가 `bidNtceFlNm{i}`/`bidNtceFlUrl{i}`를 읽는데, 명세에도 실측에도 없는 태그다 | 죽은 코드 | 없음 |
-| 4 | 중소벤처 budget 원천 `suptScale`이 명세·실측 모두에 없다 | budget 항상 None | 없음 |
+| 3 | ~~나라장터 입찰 첨부 루프가 `bidNtceFlNm{i}`/`bidNtceFlUrl{i}`를 읽는데, 명세에도 실측에도 없는 태그다~~ **v1.3.1에서 해소**(루프 삭제, 규격서 첨부는 그대로) | 죽은 코드 | 없음 |
+| 4 | ~~중소벤처 budget 원천 `suptScale`이 명세·실측 모두에 없다~~ **v1.3.1에서 해소**(손 매핑 삭제 — budget은 계속 None) | budget 항상 None | 없음 |
 | 5 | 나라장터 공사 budget = 추정가격(부가세 제외). 예산 `bdgtAmt`를 쓰지 않는다 | 용역·물품과 금액 의미가 다름 | 공고 목록 예산 칸 |
 | 6 | region 원천이 지역 필드가 아니다: 나라장터 = 수요기관명, 기업마당 = 소관기관(부처명), 계약 = 기관 분류. 공사현장지역(`cnstrtsiteRgnNm`)은 쓰지 않음 | 지역이 부정확함 | `normalize_region` 입력 — 지역 필터. **공사는 BidWatch가 현장 지역으로 덮음(2026-09-25)**, 용역·물품은 그대로 |
 | 7 | K-Startup organization의 두 번째 폴백 `sprv_inst`는 기관 유형(`민간` 등)이다 | 발주기관 칸에 유형이 표시될 수 있음 | 공고 목록·상세 |
 | 8 | status `"cancelled"`를 만드는 코드가 없다 — 나라장터 취소공고(`ntceKindNm`)도 ongoing/closed (bid-collectors REQUIREMENTS 원칙 ②에 등록됨) | | ~~취소된 공고가 진행중으로 보임~~ — **BidWatch가 원문으로 처리(2026-09-25, F-017)** |
-| 9 | K-Startup 진행중 필터를 걸어도 종료 판정을 `totalCount`로 한다(`matchCount`가 아님) → 호출이 1회 더 나감(추정, 미실측) | 호출 낭비 | 없음 |
-| 10 | 문서 파일명 오기: bid-collectors `docs/bid_collectors.md`의 `smes24.py`, `dev_reference.md`의 `mss_biz.py` → 실제는 `smes.py` | | 없음 |
+| 9 | ~~K-Startup 진행중 필터를 걸어도 종료 판정을 `totalCount`로 한다~~ **v1.3.1에서 해소**(`matchCount` 기준, 요청 4→3회. 절단 문구 "전체 N건"도 진행중 건수로. odcloud `code<0`은 `errors`로) | 호출 낭비 | 없음 |
+| 10 | ~~문서 파일명 오기 `smes24.py`·`mss_biz.py`~~ **v1.3.1에서 해소** | | 없음 |
+
+> 남은 #2·#5·#6·#7·#8은 표준 필드 값이 바뀌는 일이라 bid-collectors "원칙 ②" Phase(일반 트랙)로 넘어갔다(handover v1.3.1). #6(공사 지역)·#8(취소)은 BidWatch가 이미 원문으로 처리한다.
 
 ## 부록 B. handover v1.2.5 §2 표 보정
 
