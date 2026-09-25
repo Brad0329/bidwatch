@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import BigInteger, ForeignKey, Text, func
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import String
 

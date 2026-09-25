@@ -8,7 +8,8 @@ from app.schemas.notice import RelatedNotice
 
 logger = logging.getLogger("bidwatch.notice")
 
-SKIP_DETAIL_TYPES = {"nara"}
+# 나라장터(입찰공고·사전규격)는 fetch_detail이 없다(bid-collectors는 K-Startup만 구현) — 부르면 수집기만 만들고 None
+SKIP_DETAIL_TYPES = {"nara", "nara_prespec"}
 
 
 async def find_related(notice: BidNotice, source: SystemSource, db: AsyncSession) -> list[RelatedNotice]:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,7 +6,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.tag import TenantTag
 from app.models.tenant import User
-from app.schemas.tag import TagCreateRequest, TagResponse, TagUpdateRequest
+from app.schemas.tag import TagCreateRequest, TagResponse
 
 router = APIRouter(prefix="/api/tags", tags=["tags"])
 
