@@ -48,6 +48,7 @@ export interface SystemSource {
   is_active: boolean;
   last_collected_at: string | null;
   last_collected_count: number | null;
+  category: "bid" | "support"; // 입찰 공고 / 지원사업(선택 구독) — 백엔드 services/source_category.py가 정한다
 }
 
 export interface CollectionRunRequest {
@@ -70,6 +71,7 @@ export interface BidNotice {
   id: number;
   source_id: number;
   source_name: string;
+  source_category?: "bid" | "support"; // support면 목록에 "지원" 배지
   bid_no: string;
   title: string;
   organization: string;

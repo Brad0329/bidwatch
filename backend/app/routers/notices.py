@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import String, and_, cast, false, func, literal, or_, select, tuple_, union_all
+from sqlalchemy import String, and_, case, cast, false, func, literal, or_, select, tuple_, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -12,6 +12,7 @@ from app.models.tag import TenantTag
 from app.models.tenant import User
 from app.schemas.notice import BidNoticeResponse, NoticeListResponse
 from app.services.region import REGIONS
+from app.services.source_category import SUPPORT_COLLECTOR_TYPES, source_category
 
 router = APIRouter(prefix="/api/notices", tags=["notices"])
 
@@ -47,7 +48,10 @@ def _merged_notices_subquery(tenant_id: int, system_source_ids: list[int]):
     bid = (
         select(
             literal("bid").label("notice_type"), BidNotice.id, BidNotice.source_id,
-            SystemSource.name.label("source_name"), BidNotice.bid_no, BidNotice.title,
+            SystemSource.name.label("source_name"),
+            case((SystemSource.collector_type.in_(SUPPORT_COLLECTOR_TYPES), "support"), else_="bid")
+            .label("source_category"),
+            BidNotice.bid_no, BidNotice.title,
             BidNotice.organization, BidNotice.start_date, BidNotice.end_date, BidNotice.status,
             BidNotice.url, BidNotice.detail_url, func.coalesce(BidNotice.content, "").label("content"),
             BidNotice.budget, func.coalesce(BidNotice.region, "").label("region"),
@@ -62,6 +66,7 @@ def _merged_notices_subquery(tenant_id: int, system_source_ids: list[int]):
             literal("scraped").label("notice_type"), ScrapedNotice.id,
             ScrapedNotice.scraper_id.label("source_id"),
             func.coalesce(TenantSourceSubscription.custom_name, ScraperRegistry.name).label("source_name"),
+            cast(literal("bid"), String).label("source_category"),
             ScrapedNotice.bid_no, ScrapedNotice.title, ScrapedNotice.organization,
             ScrapedNotice.start_date, ScrapedNotice.end_date,
             func.coalesce(ScrapedNotice.status, "ongoing").label("status"),
@@ -402,6 +407,7 @@ async def get_notice(
         id=notice.id,
         source_id=notice.source_id,
         source_name=source_name,
+        source_category=source_category(source.collector_type if source else None),
         bid_no=notice.bid_no,
         title=notice.title,
         organization=notice.organization,

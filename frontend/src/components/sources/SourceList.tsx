@@ -6,6 +6,7 @@ import {
   useSubscribe,
   useUnsubscribe,
 } from "@/lib/queries/useSources";
+import type { SystemSource } from "@/types";
 import CollectionButton from "./CollectionButton";
 
 interface Props {
@@ -22,11 +23,14 @@ export default function SourceList({ showCollection = false }: Props) {
     return <div className="text-sm text-gray-400 py-4">로딩 중...</div>;
   }
 
-  // 보조금24 숨김 (추후 재판단)
-  const HIDDEN_TYPES = ["subsidy24", "nara_prespec"];
+  // 사전규격은 구독과 무관하게 입찰 예고 화면에 나온다(F-008) — 구독 목록에서 숨김
+  const HIDDEN_TYPES = ["nara_prespec"];
   const filtered = (sources || []).filter(
     (s) => !HIDDEN_TYPES.includes(s.collector_type)
   );
+  // 입찰 전문 — 지원사업은 선택 구독이라 따로 묶는다(2026-09-25). 묶음은 백엔드가 정한 category를 따른다
+  const bidSources = filtered.filter((s) => s.category !== "support");
+  const supportSources = filtered.filter((s) => s.category === "support");
   const subscribedSet = new Set(subscribed || []);
 
   const handleToggle = (sourceId: number) => {
@@ -37,9 +41,7 @@ export default function SourceList({ showCollection = false }: Props) {
     }
   };
 
-  return (
-    <div className="space-y-2">
-      {filtered.map((source) => {
+  const renderSource = (source: SystemSource) => {
         const isSubscribed = subscribedSet.has(source.id);
         const isPending =
           subscribeMutation.isPending || unsubscribeMutation.isPending;
@@ -86,7 +88,27 @@ export default function SourceList({ showCollection = false }: Props) {
             )}
           </div>
         );
-      })}
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-gray-500">입찰 공고</h4>
+        {bidSources.map(renderSource)}
+      </div>
+      {supportSources.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-gray-200 p-3">
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-gray-500">지원사업 (선택)</h4>
+            <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded">기본 꺼짐</span>
+          </div>
+          <p className="text-xs text-gray-400">
+            정부가 기업에 주는 지원(자금·바우처·교육 등) 공고입니다. 입찰이 아니라 신청해서 받는 사업이에요.
+            켜면 입찰공고 목록에 &quot;지원&quot; 표시와 함께 나옵니다.
+          </p>
+          {supportSources.map(renderSource)}
+        </div>
+      )}
     </div>
   );
 }

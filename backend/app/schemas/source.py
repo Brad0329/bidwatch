@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, computed_field, field_validator
+
+from app.services.source_category import source_category
 
 
 class SourceAddRequest(BaseModel):
@@ -37,6 +39,12 @@ class SystemSourceResponse(BaseModel):
     last_collected_count: int | None
 
     model_config = {"from_attributes": True}
+
+    @computed_field
+    @property
+    def category(self) -> str:
+        """"bid"(입찰 공고) | "support"(지원사업, 선택 구독) — services/source_category.py"""
+        return source_category(self.collector_type)
 
 
 class BuiltinSiteResponse(BaseModel):

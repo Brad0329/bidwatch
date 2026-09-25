@@ -20,6 +20,7 @@ class BidNoticeResponse(BaseModel):
     id: int
     source_id: int
     source_name: str = ""
+    source_category: str = "bid"  # "bid" | "support"(지원사업 — 목록에 "지원" 배지). services/source_category.py
     bid_no: str
     title: str
     organization: str

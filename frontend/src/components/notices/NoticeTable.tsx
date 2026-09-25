@@ -66,10 +66,16 @@ export default function NoticeTable({ notices, onFilterByKeyword, onFilterByOrg,
             className="grid grid-cols-[90px_1fr_120px_80px_80px_70px_130px] gap-3 px-6 py-3.5 border-b border-gray-50 items-center hover:bg-blue-50/50 transition-colors"
           >
             {/* 출처 */}
-            <div>
-              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium truncate block">
+            <div className="min-w-0 flex flex-col items-start gap-1">
+              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium truncate block max-w-full">
                 {notice.source_name || "—"}
               </span>
+              {/* 지원사업 출처(선택 구독) — 입찰이 아니라 신청해서 받는 공고 */}
+              {notice.source_category === "support" && (
+                <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">
+                  지원
+                </span>
+              )}
             </div>
 
             {/* 공고명 — 클릭 시 모달 */}
