@@ -53,6 +53,13 @@ async def test_notice_source_category_in_list_and_detail(client: AsyncClient):
         items = (await client.get("/api/notices", headers=headers)).json()["items"]
         assert {i["bid_no"]: i["source_category"] for i in items} == {f"BIZINFO-{t}": "support", f"용역-{t}": "bid"}
 
+        # 전체 출처(입찰) / 전체 출처(지원) — 건수(total)도 묶음대로
+        for cat, expected in (("bid", [f"용역-{t}"]), ("support", [f"BIZINFO-{t}"])):
+            resp = (await client.get("/api/notices", params={"category": cat}, headers=headers)).json()
+            assert [i["bid_no"] for i in resp["items"]] == expected
+            assert resp["total"] == 1
+        assert (await client.get("/api/notices", params={"category": "x"}, headers=headers)).status_code == 422
+
         support_id = next(i["id"] for i in items if i["bid_no"] == f"BIZINFO-{t}")
         detail = (await client.get(f"/api/notices/{support_id}", headers=headers)).json()
         assert detail["source_category"] == "support"

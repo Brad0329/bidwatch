@@ -99,6 +99,7 @@ async def list_notices(
     q: str | None = None,
     source_id: int | None = None,
     scraper_id: int | None = None,
+    category: str | None = Query(None, pattern="^(bid|support)$"),
     status: str | None = None,
     tag: str | None = None,
     region: str | None = None,
@@ -135,6 +136,8 @@ async def list_notices(
         conds += [n.c.notice_type == "bid", n.c.source_id == source_id]
     if scraper_id:
         conds += [n.c.notice_type == "scraped", n.c.source_id == scraper_id]
+    if category:  # 전체 출처(입찰) / 전체 출처(지원) — 직접 추가 사이트는 입찰 묶음
+        conds.append(n.c.source_category == category)
     if status:
         conds.append(n.c.status == status)
     if not tag:
