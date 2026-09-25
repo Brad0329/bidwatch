@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import String, and_, cast, func, literal, or_, select, tuple_, union_all
+from sqlalchemy import String, and_, cast, false, func, literal, or_, select, tuple_, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -52,7 +52,7 @@ def _merged_notices_subquery(tenant_id: int, system_source_ids: list[int]):
             BidNotice.url, BidNotice.detail_url, func.coalesce(BidNotice.content, "").label("content"),
             BidNotice.budget, func.coalesce(BidNotice.region, "").label("region"),
             func.coalesce(BidNotice.category, "").label("category"), BidNotice.collected_at,
-            BidNotice.attachments, BidNotice.extra,
+            BidNotice.attachments, BidNotice.extra, BidNotice.superseded,
         )
         .join(SystemSource, SystemSource.id == BidNotice.source_id)
         .where(BidNotice.source_id.in_(system_source_ids))
@@ -69,7 +69,7 @@ def _merged_notices_subquery(tenant_id: int, system_source_ids: list[int]):
             func.coalesce(ScrapedNotice.content, "").label("content"), ScrapedNotice.budget,
             func.coalesce(ScrapedNotice.region, "").label("region"),
             cast(literal(""), String).label("category"), ScrapedNotice.collected_at,
-            ScrapedNotice.attachments, ScrapedNotice.extra,
+            ScrapedNotice.attachments, ScrapedNotice.extra, false().label("superseded"),
         )
         .join(ScraperRegistry, ScraperRegistry.id == ScrapedNotice.scraper_id)
         .join(TenantSourceSubscription, and_(
@@ -132,6 +132,12 @@ async def list_notices(
         conds += [n.c.notice_type == "scraped", n.c.source_id == scraper_id]
     if status:
         conds.append(n.c.status == status)
+    if not tag:
+        # 나라장터 차수 정리(F-017): 이전 차수는 빼고 최신 차수만, 취소 공고는 status=cancelled로 고를 때만.
+        # 태그 필터(검토요청 등)는 거르지 않는다 — 사용자가 태그를 단 공고가 사라지지 않게
+        conds.append(n.c.superseded.is_(False))
+        if status != "cancelled":
+            conds.append(n.c.status != "cancelled")
     if q:
         conds.append(or_(
             n.c.title.ilike(f"%{q}%"), n.c.organization.ilike(f"%{q}%"), n.c.content.ilike(f"%{q}%"),
@@ -363,9 +369,11 @@ async def get_notice(
 
     # 상세 보충: content가 비어있으면 bid-collectors fetch_detail 호출
     source = await db.get(SystemSource, notice.source_id)
+    related = []
     if source:
-        from app.services.notice import enrich_notice_detail
+        from app.services.notice import enrich_notice_detail, find_related
         await enrich_notice_detail(notice, source, db)
+        related = await find_related(notice, source, db)
 
     # source_name
     source_name = source.name if source else ""
@@ -411,6 +419,5 @@ async def get_notice(
         tag=notice_tag,
         attachments=notice.attachments,
         extra=notice.extra,
+        related=related,
     )
-
-

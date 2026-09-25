@@ -17,6 +17,7 @@ interface Props {
   notice: BidNotice;
   onClose: () => void;
   onTagChange?: () => void;
+  nested?: boolean; // 연결 공고(F-018)로 위에 겹쳐 연 모달 — 페이지 스크롤 잠금은 바깥 모달이 맡는다
 }
 
 function formatBudget(budget: number | null): string {
@@ -36,24 +37,39 @@ function getDday(endDate: string | null): { text: string; color: string } {
   return { text: `D-${diff}`, color: "text-blue-600" };
 }
 
-export default function NoticeModal({ notice: initialNotice, onClose, onTagChange }: Props) {
+export default function NoticeModal({ notice: initialNotice, onClose, onTagChange, nested }: Props) {
   const [notice, setNotice] = useState(initialNotice);
   const [loading, setLoading] = useState(false);
   const [currentTag, setCurrentTag] = useState<string | null>(initialNotice.tag || null);
   const [tagSaving, setTagSaving] = useState(false);
+  const [linked, setLinked] = useState<BidNotice | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
 
-  // ESC 키로 닫기
+  // ESC 키로 닫기 — 연결 공고 모달이 떠 있으면 그쪽이 먼저 닫힌다
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !linked) onClose();
     };
     document.addEventListener("keydown", handleKeyDown);
-    document.body.style.overflow = "hidden";
+    if (!nested) document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
+      if (!nested) document.body.style.overflow = "";
     };
-  }, [onClose]);
+  }, [onClose, linked, nested]);
+
+  const openLinked = async (id: number) => {
+    if (linkLoading) return;
+    setLinkLoading(true);
+    try {
+      const res = await api.get<BidNotice>(`/api/notices/${id}`);
+      setLinked({ ...res.data, notice_type: "bid" });
+    } catch (err) {
+      console.error("연결 공고 상세 조회 실패", err);
+    } finally {
+      setLinkLoading(false);
+    }
+  };
 
   const noticeType = initialNotice.notice_type ?? "bid";
 
@@ -110,8 +126,12 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
   const dday = getDday(notice.end_date);
   const ex: Extra = notice.extra || {};
   const isNara = notice.source_name === "나라장터";
+  // K-Startup 상세 보충의 apply_url, 없으면 기업마당 사업신청URL
+  const applyUrl = text(ex.apply_url) ?? text(ex.rceptEngnHmpgUrl);
+  const stdDocUrl = text(ex.stdNtceDocUrl);
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       onClick={onClose}
@@ -131,17 +151,21 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
               {noticeType !== "scraped" && (
                 <span
                   className={`text-xs font-semibold ${
-                    notice.status === "ongoing"
-                      ? "bg-green-50 text-green-700"
-                      : "bg-gray-100 text-gray-500"
+                    notice.status === "cancelled"
+                      ? "bg-red-50 text-red-700"
+                      : notice.status === "ongoing"
+                        ? "bg-green-50 text-green-700"
+                        : "bg-gray-100 text-gray-500"
                   } px-2 py-0.5 rounded`}
                 >
-                  {notice.status === "ongoing" ? "진행중" : "마감"}
+                  {notice.status === "cancelled" ? "취소" : notice.status === "ongoing" ? "진행중" : "마감"}
                 </span>
               )}
-              <span className={`text-xs font-bold ${dday.color}`}>
-                {dday.text}
-              </span>
+              {notice.status !== "cancelled" && (
+                <span className={`text-xs font-bold ${dday.color}`}>
+                  {dday.text}
+                </span>
+              )}
             </div>
             <h2 className="text-lg font-bold text-gray-900 leading-snug">
               {notice.title}
@@ -259,6 +283,31 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
             </div>
           )}
 
+          {/* 사전규격 ↔ 본 공고 (F-018) */}
+          {(notice.related || []).length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">연결된 공고</h3>
+              <div className="space-y-1.5">
+                {notice.related!.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => openLinked(r.id)}
+                    disabled={linkLoading}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-blue-50 rounded-lg transition-colors group text-left disabled:opacity-50"
+                  >
+                    <span className="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded shrink-0">
+                      {r.kind === "prespec" ? "사전규격 보기" : "본 공고 보기"}
+                    </span>
+                    <span className="text-sm text-gray-700 group-hover:text-blue-600 truncate">{r.title}</span>
+                    {r.status === "cancelled" && (
+                      <span className="text-xs font-semibold bg-red-50 text-red-700 px-2 py-0.5 rounded shrink-0">취소</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 링크 버튼 */}
           <div className="flex gap-3 pt-2">
             {notice.url && (
@@ -272,15 +321,26 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
                 공고 사이트 바로가기
               </a>
             )}
-            {text(ex.apply_url) && (
+            {applyUrl && (
               <a
-                href={text(ex.apply_url)!}
+                href={applyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
               >
                 <i className="ri-edit-line"></i>
                 신청 페이지
+              </a>
+            )}
+            {stdDocUrl && (
+              <a
+                href={stdDocUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+              >
+                <i className="ri-file-download-line"></i>
+                표준공고서
               </a>
             )}
             {notice.detail_url && notice.detail_url !== notice.url && (
@@ -298,6 +358,11 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
         </div>
       </div>
     </div>
+    {/* 연결 공고는 바깥 오버레이의 자식이 아니라 형제로 — 클릭이 바깥 모달의 닫기로 번지지 않게 */}
+    {linked && (
+      <NoticeModal notice={linked} onClose={() => setLinked(null)} onTagChange={onTagChange} nested />
+    )}
+    </>
   );
 }
 
@@ -384,7 +449,28 @@ function NaraExtra({ ex, bidNo }: { ex: Extra; bidNo: string }) {
   const bidType = bidNo.split("-")[0];
   if (["용역", "물품", "공사"].includes(bidType)) rows.unshift(["입찰 구분", bidType]);
 
-  return <ExtraSection title="나라장터 상세" rows={rows} />;
+  // 입찰 참가 판단용 — 값이 있는 것만. Y/N 플래그는 Y일 때만 보인다(N은 "제한 없음"이라 적을 게 없다)
+  const kind = text(ex.ntceKindNm);
+  const lwlt = text(ex.sucsfbidLwltRate);
+  const briefing = [text(ex.dcmtgOprtnDt), text(ex.dcmtgOprtnPlce)].filter(Boolean).join(" · ");
+  const conditions: Row[] = [
+    ["공고 종류", kind && kind !== "등록공고" ? kind : null],
+    ["변경·취소 사유", text(ex.chgNtceRsn)],
+    // 실제 참가 가능 지역 목록은 별도 API라 없다 — 여기는 "소재지를 무엇으로 보나"의 기준
+    ["지역제한 판단기준", text(ex.rgnLmtBidLocplcJdgmBssNm)],
+    ["업종 제한", text(ex.indstrytyLmtYn) === "Y" ? "있음 (공고서 참고)" : null],
+    ["공동수급", text(ex.cmmnSpldmdMethdNm)],
+    ["낙찰하한율", lwlt ? `${lwlt}%` : null],
+    ["설명회", briefing || null],
+    ["공사 현장", text(ex.cnstrtsiteRgnNm)],
+  ];
+
+  return (
+    <>
+      <ExtraSection title="나라장터 상세" rows={rows} />
+      <ExtraSection title="입찰 참가 조건" rows={conditions} />
+    </>
+  );
 }
 
 /* K-Startup / 기업마당 — 출처끼리 키가 겹치지 않아 한 목록으로 둔다 */
@@ -392,12 +478,14 @@ function GeneralExtra({ ex }: { ex: Extra }) {
   const rows: Row[] = [
     ["사업명", plain(ex.intg_pbanc_biz_nm)],
     ["지원 대상", plain(ex.aply_trgt_ctnt) ?? plain(ex.trgetNm)],
+    ["신청 대상 유형", text(ex.aply_trgt)],
     ["대상 연령", text(ex.biz_trgt_age)],
     ["창업 기간", text(ex.biz_enyy)],
     ["제외 대상", plain(ex.aply_excl_trgt_ctnt)],
     ["접수 방법",
       plain(first(ex, "aply_mthd_onli_rcpt_istc", "aply_mthd_vst_rcpt_istc", "aply_mthd_etc_istc"))
       ?? plain(ex.reqstMthPapersCn)],
+    ["이메일 접수", text(ex.aply_mthd_eml_rcpt_istc)],
     ["담당부서", plain(ex.biz_prch_dprt_nm)],
     ["문의처", text(ex.prch_cnpl_no)],
     ["세부 분류", text(ex.pldirSportRealmMlsfcCodeNm)],

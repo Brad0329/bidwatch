@@ -26,7 +26,7 @@
 | 출처 | start_date | end_date | status 판정 | budget | organization | region(원문 → BidWatch가 `normalize_region`) | category |
 |---|---|---|---|---|---|---|---|
 | 나라장터 입찰 용역·물품 | `bidNtceDt` 공고일시 | `bidClseDt` 입찰마감 | 마감일 | `asignBdgtAmt` **배정예산** | `ntceInsttNm` **공고기관** | `dminsttNm` **수요기관명**(지역 필드 아님) | 공공조달 대>중 분류 / 물품은 세부품명 |
-| 나라장터 입찰 공사 | 같음 | 같음 | 마감일 | `presmptPrce` **추정가격(부가세 제외)** — 공사엔 배정예산 태그가 없다. 예산 `bdgtAmt`는 안 씀 | 같음 | 같음(공사현장 `cnstrtsiteRgnNm`은 안 씀) | 주공종명 |
+| 나라장터 입찰 공사 | 같음 | 같음 | 마감일 | `presmptPrce` **추정가격(부가세 제외)** — 공사엔 배정예산 태그가 없다. 예산 `bdgtAmt`는 안 씀 | 같음 | bid-collectors는 같음 — **BidWatch는 공사현장 `cnstrtsiteRgnNm`으로 덮는다**(2026-09-25, `notice_region`) | 주공종명 |
 | 나라장터 사전규격 (`nara_prespec`) | `rcptDt` 접수일시 | `opninRgstClseDt` 의견등록마감 | 마감일 | `asignBdgtAmt` 배정예산 | `orderInsttNm` 발주기관 | 없음 | `prdctClsfcNoNm` (**title과 같은 값**) |
 | 나라장터 낙찰 (BidWatch 미사용) | `fnlSucsfDate` 최종낙찰일 | 없음 | 항상 closed | `sucsfbidAmt` **낙찰금액** | `dminsttNm` 수요기관 | 없음 | 없음 |
 | 나라장터 계약 (BidWatch 미사용) | `cntrctCnclsDate` 체결일 | `cntrctPrd` 계약기간 — **틀리는 경우 많음**(부록 A-2) | 마감일 | `thtmCntrctAmt` 금차계약금액 | `cntrctInsttNm` 계약기관 | `cntrctInsttJrsdctnDivNm` **기관 분류**(국가기관 등) | 없음 |
@@ -39,7 +39,8 @@
 
 **공통 규칙 (코드 확인)**
 - `parse_date`는 기간 문자열("A~B")이면 **시작일**을 돌려준다(`utils/dates.py`). end_date 원천이 기간 문자열인 출처에서 end_date가 틀린다.
-- status는 **수집 시점의 날짜로 계산해 저장**한 값이다. 이후에는 다시 계산하지 않는다. `"cancelled"`를 만드는 코드가 없어서 나라장터 취소공고(`ntceKindNm=취소공고`)도 ongoing/closed로 들어온다.
+- status는 **수집 시점의 날짜로 계산해 저장**한 값이다. 이후에는 다시 계산하지 않는다. bid-collectors에는 `"cancelled"`를 만드는 코드가 없어서 나라장터 취소공고(`ntceKindNm=취소공고`)도 ongoing/closed로 온다
+  — **BidWatch가 저장 시점에 원문으로 `cancelled`를 넣고 같은 공고번호의 낮은 차수에도 퍼뜨린다**(2026-09-25, F-017 `refresh_revisions`).
 - end_date가 없으면 status는 항상 ongoing이다(나라장터 입찰 용역 12%·물품 9%·공사 1%, 기업마당 18%, 보조금24 96%, 알리오 2%).
 - content: K-Startup·중소벤처는 **앞 500자에서 자른다**. 나라장터·알리오·URL 출처는 항상 빈 문자열이다.
 - budget은 출처마다 배정예산·추정가격·낙찰금액·계약금액으로 **서로 다른 개념**이다. 출처를 가로질러 금액을 비교하면 안 된다.
@@ -167,7 +168,7 @@
 | rgnDutyJntcontrctYn / rgnDutyJntcontrctRt | 지역의무공동도급 여부 / 비율(%) | | 공사 942 / 20 |
 | jntcontrctDutyRgnNm1~3 | 공동도급의무지역명 | | 공사 드묾 |
 | incntvRgnNm1~4 | 가산지역명 (공사) | 적격심사 가산점 지역 | 공사 13 |
-| cnstrtsiteRgnNm | 공사현장지역명 (공사) | **실제 공사 지역**(`경상북도 포항시 남구`). region에 쓰이지 않는다 | 공사 942 |
+| cnstrtsiteRgnNm | 공사현장지역명 (공사) | **실제 공사 지역**(`경상북도 포항시 남구`). BidWatch가 region으로 쓴다(2026-09-25) | 공사 942 |
 
 **분류·품목·공종**
 | 키 | 항목명 | 의미 | 출현 | 근거 |
@@ -448,9 +449,9 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 | 3 | 나라장터 입찰 첨부 루프가 `bidNtceFlNm{i}`/`bidNtceFlUrl{i}`를 읽는데, 명세에도 실측에도 없는 태그다 | 죽은 코드 | 없음 |
 | 4 | 중소벤처 budget 원천 `suptScale`이 명세·실측 모두에 없다 | budget 항상 None | 없음 |
 | 5 | 나라장터 공사 budget = 추정가격(부가세 제외). 예산 `bdgtAmt`를 쓰지 않는다 | 용역·물품과 금액 의미가 다름 | 공고 목록 예산 칸 |
-| 6 | region 원천이 지역 필드가 아니다: 나라장터 = 수요기관명, 기업마당 = 소관기관(부처명), 계약 = 기관 분류. 공사현장지역(`cnstrtsiteRgnNm`)은 쓰지 않음 | 지역이 부정확함 | `normalize_region` 입력 — 지역 필터 |
+| 6 | region 원천이 지역 필드가 아니다: 나라장터 = 수요기관명, 기업마당 = 소관기관(부처명), 계약 = 기관 분류. 공사현장지역(`cnstrtsiteRgnNm`)은 쓰지 않음 | 지역이 부정확함 | `normalize_region` 입력 — 지역 필터. **공사는 BidWatch가 현장 지역으로 덮음(2026-09-25)**, 용역·물품은 그대로 |
 | 7 | K-Startup organization의 두 번째 폴백 `sprv_inst`는 기관 유형(`민간` 등)이다 | 발주기관 칸에 유형이 표시될 수 있음 | 공고 목록·상세 |
-| 8 | status `"cancelled"`를 만드는 코드가 없다 — 나라장터 취소공고(`ntceKindNm`)도 ongoing/closed (bid-collectors REQUIREMENTS 원칙 ②에 등록됨) | | 취소된 공고가 진행중으로 보임 |
+| 8 | status `"cancelled"`를 만드는 코드가 없다 — 나라장터 취소공고(`ntceKindNm`)도 ongoing/closed (bid-collectors REQUIREMENTS 원칙 ②에 등록됨) | | ~~취소된 공고가 진행중으로 보임~~ — **BidWatch가 원문으로 처리(2026-09-25, F-017)** |
 | 9 | K-Startup 진행중 필터를 걸어도 종료 판정을 `totalCount`로 한다(`matchCount`가 아님) → 호출이 1회 더 나감(추정, 미실측) | 호출 낭비 | 없음 |
 | 10 | 문서 파일명 오기: bid-collectors `docs/bid_collectors.md`의 `smes24.py`, `dev_reference.md`의 `mss_biz.py` → 실제는 `smes.py` | | 없음 |
 

@@ -72,10 +72,18 @@ tenant_matches · subscriptions · notification_settings
 - **결정**: `region`에 수집 시점 정규화한 짧은 이름(17개 시/도)을 저장. 정규화 불가 값은 원본 유지.
 - **이유**: 수집기마다 표기가 달라 조회 시점 매칭이 복잡해진다. 로직 변경 시 `backend/scripts/backfill_regions.py`로 소급.
   (`work_log/Phase_008.md`)
+- **원천 (2026-09-25)**: 나라장터 공사는 `extra.cnstrtsiteRgnNm`(공사현장), 그 외는 bid-collectors `region`(나라장터는 수요기관명)
+  — `services/region.notice_region`. 소급은 같은 함수(538건 반영).
+
+### 나라장터 차수·취소 — bidwatch가 원문으로 판정 (2026-09-25, F-017)
+- **결정**: 이전 차수는 `superseded`(006), 취소는 기존 `status`에 `'cancelled'`. 둘 다 수집 저장 직후 `extra` 원문으로 bidwatch가 정한다.
+- **이유**: bid-collectors는 "표준 필드에 추정 금지" 원칙으로 status·region 방침이 미정이다 — 원문(`extra`)에 기대면 그쪽 결정과 무관하다(사용자 결정).
+- **주의**: 재수집 upsert는 status를 bid-collectors 값으로 덮지만 곧바로 `refresh_revisions`가 되살린다 — upsert 경로 밖에서 bid_notices를 쓰면 이 함수를 불러야 한다.
 
 ## 변경 이력 (최신이 위)
 | 날짜 | 변경안 (무엇을, 왜, 영향 범위) | 사용자 확인 | 반영 |
 |---|---|---|---|
+| 2026-09-25 | 006: `bid_notices.superseded BOOLEAN NOT NULL DEFAULT false` 추가 — 나라장터는 변경·재·취소공고가 **새 차수**(bid_no 끝 `-001`…)로 따로 와서 한 공고가 여러 행이 된다(7일치 6,345건 중 496행이 더 높은 차수가 있는 이전 차수). 목록은 최신 차수만 보여야 한다(F-017, 2026-09-25 사용자 결정). **왜 컬럼인가**: 조회 때 `extra->>'bidNtceNo'` NOT EXISTS로 거르면 1만 행에서 1회 205ms(해시 안티조인, 실측 `scripts/_tmp/latest_ord_perf.py`) — 목록은 건수+페이지 2회라 +0.4초, 한 달치면 ~1초 이상으로 늘어난다. 수집 때 한 번 계산해 두면 목록은 `superseded = false` 조건 하나. **값의 원천**: `extra`의 `bidNtceNo`·`bidNtceOrd`(원문) — 같은 출처·같은 공고번호에 더 높은 차수 행이 있으면 true. 수집(upsert) 직후 그 출처 전체를 다시 계산(`services/collection.refresh_revisions` — 행을 한 번 읽어 파이썬에서 판정, 바뀐 행만 id로 UPDATE. SQL 한 문장은 플래너가 JSONB 조건을 1행으로 오판해 20초 걸려 버렸다). 마이그레이션은 컬럼만 추가하고 기존 행은 같은 함수를 부르는 `backend/scripts/backfill_revisions.py`로 채운다(구현 한 곳). 영향: 목록 API 두 곳(공고·사전규격 — 사전규격은 해당 키가 없어 늘 false), 태그 필터가 걸린 조회(검토요청 등)는 거르지 않는다. 같은 작업의 **취소**는 컬럼 추가 없이 기존 `status`에 `'cancelled'`(interface.md 값 집합에 이미 있음)를 bidwatch가 `extra.ntceKindNm='취소공고'`로 넣고 같은 공고번호의 낮은 차수에도 퍼뜨린다. 버린 대안: 조회 시 NOT EXISTS(느림·데이터에 비례) / `extra->>'bidNtceNo'` 식 인덱스(안티조인은 여전히 전체를 훑는다) / `status='superseded'` 재사용(상태 의미가 섞이고 마감·취소와 겹친다). 되돌리기: downgrade = 컬럼 삭제(값은 extra에서 다시 계산 가능, 잃는 데이터 없음), 착수 전 `pg_dump` 백업 `scripts/_tmp/backup_before_006_20260925_135101.dump`. 실측(공고 1만 행 개발 DB): upgrade→downgrade→upgrade 왕복 OK, 채운 뒤 nara 6,345건 중 이전 차수 496·취소 579(취소공고 367 + 그보다 낮은 차수), 취소됐는데 cancelled 아닌 낮은 차수 0. **같은 작업의 데이터 변경**: 차수 정리가 이전 차수의 태그(`tenant_tags.notice_id`)를 최신 차수로 옮긴다(2026-09-25 사용자 결정 — 최신 차수에 그 회사 태그가 있으면 안 옮김) | ✅ 2026-09-25 ("컬럼 추가 진행") | `006_bid_notices_superseded.py` |
 | 2026-09-24 | 005: system_sources에 `alio`(알리오 공공기관 입찰공고) 행 추가 — 003(nara_prespec)과 같은 데이터 행 추가, 컬럼 변경 없음. 자체조달 공기업 공고를 공공 출처로 받기 위해(`procurement_sources_research.md` 3-1). 영향: 공공 출처 목록에 1행, 구독해야 공고 목록에 나온다. 되돌리기: 이 출처의 공고·구독이 있으면 downgrade 거부 | ✅ 2026-09-24 ("전용 수집기 + 공공 출처" 선택) | `005_add_alio_source.py` |
 | 2026-09-24 | 004: `scraper_registry.is_builtin BOOLEAN NOT NULL DEFAULT false` 추가 + `created_by_tenant_id` NULL 허용 — lets_portal 손 설정 39곳을 기본 제공 사이트로 옮겨 관리자설정에 목록 표시. 영향: 기존 행은 false·값 유지(데이터 변경 없음), 읽는 곳은 새 목록 API 1개, `created_by_tenant_id`는 쓰기만 하고 읽는 코드 없음. 되돌리기: 기본 제공 행(NULL)이 있으면 downgrade가 거부하고 멈춘다(조용히 지우지 않음) — 실측: 행 없을 때 왕복 OK·데이터 digest 동일, 행 있을 때 거부·004 유지. 백업 `scripts/_tmp/backup_before_004_*.dump` | ✅ 2026-09-24 | `004_scraper_builtin.py` |
 | 2026-04-13 | 003: system_sources에 nara_prespec 행 추가 — 입찰 예고(F-008) | ✅ | `003_add_nara_prespec_source.py` |

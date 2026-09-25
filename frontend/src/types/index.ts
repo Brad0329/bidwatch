@@ -87,6 +87,15 @@ export interface BidNotice {
   tag: string | null;
   attachments: Array<{ name: string; url: string }> | null;
   extra: Record<string, unknown> | null;
+  related?: RelatedNotice[]; // 상세 API만 — 사전규격 ↔ 본 공고 (F-018)
+}
+
+export interface RelatedNotice {
+  id: number;
+  kind: "prespec" | "notice";
+  bid_no: string;
+  title: string;
+  status: string;
 }
 
 export interface NoticeListResponse {

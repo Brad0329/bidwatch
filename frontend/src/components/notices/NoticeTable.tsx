@@ -58,7 +58,8 @@ export default function NoticeTable({ notices, onFilterByKeyword, onFilterByOrg,
 
       {/* Rows */}
       {notices.map((notice) => {
-        const dday = getDday(notice.end_date);
+        // 취소 공고는 검토요청 등 태그 목록에만 나온다(F-017) — 마감일 자리에 "취소"
+        const dday = notice.status === "cancelled" ? { text: "취소", urgent: true } : getDday(notice.end_date);
         return (
           <div
             key={`${notice.notice_type}-${notice.id}`}

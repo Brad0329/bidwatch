@@ -3,6 +3,15 @@ from datetime import date, datetime
 from pydantic import BaseModel
 
 
+class RelatedNotice(BaseModel):
+    """상세에서 이어지는 공고 (F-018). kind: "prespec"(본 공고 → 사전규격) | "notice"(사전규격 → 본 공고)."""
+    id: int
+    kind: str
+    bid_no: str
+    title: str
+    status: str
+
+
 class BidNoticeResponse(BaseModel):
     # "bid"(공공 API 출처) | "scraped"(직접 추가한 URL 출처) — 두 테이블은 id가 겹치므로 (notice_type, id)가 식별자.
     # scraped면 source_id 자리에 scraper_id가 들어간다.
@@ -27,6 +36,7 @@ class BidNoticeResponse(BaseModel):
     tag: str | None = None
     attachments: list[dict] | None = None
     extra: dict | None = None
+    related: list[RelatedNotice] = []  # 상세 API만 채운다
 
     model_config = {"from_attributes": True}
 

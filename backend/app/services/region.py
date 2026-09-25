@@ -65,6 +65,16 @@ _ALIASES_BY_LENGTH = sorted(_REGION_ALIASES.items(), key=lambda kv: -len(kv[0]))
 _UNAMBIGUOUS_ALIASES = [(a, s) for a, s in _ALIASES_BY_LENGTH if len(a) >= 4]
 
 
+def notice_region(region: str | None, extra: dict | None) -> str | None:
+    """공고 1건의 저장용 지역. 나라장터 공사는 수요기관명(bid-collectors가 region에 넣는 값)이 아니라
+    공사현장 지역(extra.cnstrtsiteRgnNm)을 쓴다 — 없으면 region으로 대체 (F-011, 2026-09-25).
+    수집(collection.py)과 소급(scripts/backfill_regions.py)이 같이 쓴다."""
+    site = (extra or {}).get("cnstrtsiteRgnNm")
+    if isinstance(site, str) and site.strip():
+        return normalize_region(site)
+    return normalize_region(region)
+
+
 def normalize_region(raw: str | None) -> str | None:
     """수집된 region 문자열을 정규화된 짧은 이름으로 변환.
 

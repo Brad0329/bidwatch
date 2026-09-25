@@ -16,7 +16,7 @@ import asyncio
 import asyncpg
 
 from app.config import settings
-from app.services.region import normalize_region
+from app.services.region import normalize_region, notice_region
 
 TABLES = ["bid_notices", "scraped_notices"]
 
@@ -65,11 +65,46 @@ async def backfill_table(conn: asyncpg.Connection, table: str, dry_run: bool) ->
     print(f"[{table}] 반영 완료")
 
 
+async def backfill_site_region(conn: asyncpg.Connection, dry_run: bool) -> None:
+    """나라장터 공사: 공사현장 지역(extra.cnstrtsiteRgnNm)으로 (2026-09-25, notice_region과 같은 규칙).
+
+    수요기관명에서 뽑은 region이 기관명 그대로 남아 지역 필터에 안 걸리던 행이 대부분이다.
+    """
+    rows = await conn.fetch(
+        "select coalesce(region, '') as region, extra->>'cnstrtsiteRgnNm' as site, count(*) as n "
+        "from bid_notices where coalesce(extra->>'cnstrtsiteRgnNm', '') <> '' group by 1, 2"
+    )
+    changes = []
+    for row in rows:
+        new = notice_region(row["region"], {"cnstrtsiteRgnNm": row["site"]})
+        if new != row["region"]:
+            changes.append((row["region"], row["site"], new, row["n"]))
+
+    affected = sum(c[3] for c in changes)
+    print(f"[bid_notices 공사현장] (지역, 현장) 조합 {len(rows)}개 중 {len(changes)}개 변경 → 공고 {affected}건 영향")
+    for old, site, new, n in sorted(changes, key=lambda c: -c[3])[:15]:
+        print(f"    {n:5d}  {old!r} (현장 {site!r}) -> {new!r}")
+    if dry_run or not changes:
+        if dry_run:
+            print("[bid_notices 공사현장] --dry-run 이므로 반영하지 않음")
+        return
+
+    async with conn.transaction():
+        for old, site, new, _ in changes:
+            await conn.execute(
+                "update bid_notices set region = $1 "
+                "where coalesce(region, '') = $2 and extra->>'cnstrtsiteRgnNm' = $3",
+                new, old, site,
+            )
+    print("[bid_notices 공사현장] 반영 완료")
+
+
 async def main(dry_run: bool) -> None:
     conn = await asyncpg.connect(_dsn())
     try:
         for table in TABLES:
             await backfill_table(conn, table, dry_run)
+        await backfill_site_region(conn, dry_run)
     finally:
         await conn.close()
 
