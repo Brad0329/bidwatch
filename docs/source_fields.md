@@ -447,6 +447,23 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 
 ---
 
+## 11. 자체조달 기관 — LH·가스공사·국방전자조달·수자원공사 (bid-collectors v1.4.0, 2026-09-26)
+
+- **원천·함정·키 뜻의 원본은 bid-collectors `docs/institution_sources.md`** — 여기는 BidWatch가 쓰는 키만 적는다(이중 관리 안 함).
+- 공통: `budget`·`region`은 **비어 온다**(7일 실측 575건 전부) — 금액은 extra 원래 이름으로 상세 "금액" 칸에(`NoticeModal.tsx` `InstitutionExtra`),
+  지역은 "지역 미상". 출처는 bid_no 접두사(`LH-`·`KOGAS-`·`D2B-`·`KWATER-`)로 가린다.
+- 취소·차수(F-017, `services/collection.py`): LH `bidKind`(일반/정정/취소공고, 같은 행이 덮임 — `bidDegree` 00→01) · 가스 `CANCEL_YN=취소`(3/54) ·
+  국방 `pblancSe`(정상/긴급/재/정정/취소공고, 경쟁 3종 130건) · 국방 수의 2종(288건, `pblancSe` 없음)은 `progrsSttus`(진행중/**공개협상취소** 34) —
+  **handover에 없던 키, bidwatch 실측**. 국방 `pblancCanclAt`은 4건 모두 N이라 쓰지 않는다.
+- 금액: LH `presmtPrc` 추정가격·`designPrc` 설계가·`fdmtlAmt` 기초금액·`addtTax` 부가세(52/52) · 국방 `bsicExpt` 기초예비가격 186·`baseAmnt` 기초금액 195·
+  `budgetAmount` 예산 288(수의 2종)/418 · 수자원 `tndrPlnprc` 예정가격(0 = 미공개 41/51) · 가스공사 금액 없음.
+- 날짜 형식이 출처마다 다르다: LH `2026/09/18 14:00` · 가스 `2026-09-22 13:00` · 국방 `202609281030`(화면에서 `2026-09-28 10:30`으로) · 수자원 `20260928`.
+- LH 면허: `req{n}Reqlic{k}Nm`(면허 이름) · `req{n}MvgbNm`(주/부업종) · `req{n}LicctNm`(등록 조건 문장) — 12/52건. 지역 제한 `zoneRstrct1~4` 6건.
+  `vndrrstrctNm1`(5건, 값 "경기" 등)은 뜻이 확인되지 않아 표시하지 않는다.
+- 재현: `scripts/_tmp/inst_extra_keys.py`(키별 출현·예시) · `inst_value_counts.py <type> <key>` · `collect_institutions.py [days]`.
+
+---
+
 ## 부록 A. bid-collectors 쪽 결함·불일치 (2026-09-25 조사 중 발견 — bid-collectors에 전달할 것)
 
 | # | 내용 | 영향 | BidWatch 영향 |

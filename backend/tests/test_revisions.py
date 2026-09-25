@@ -1,4 +1,4 @@
-"""나라장터 차수 정리(F-017)·공사 지역(F-011)·사전규격 연결(F-018).
+"""차수 정리·취소(F-017 — 나라장터·국방·LH·가스공사)·공사 지역(F-011)·사전규격 연결(F-018).
 
 수집 저장 경로(upsert_bid_notices → refresh_revisions)를 실제 DB로 통과시킨다. 공유 테이블에 넣은 행과
 태그는 끝나면 지운다 — 테스트가 개발 DB를 쓴다. 공고번호에 token을 넣어 실제 공고와 섞이지 않게 한다.
@@ -96,6 +96,51 @@ async def test_recollect_keeps_revision_flags(store):
     r = await rows(t)
     assert r[f"용역-T{t}A-000"].status == "cancelled"
     assert r[f"용역-T{t}A-000"].superseded is True
+
+
+def _d2b(token: str, key: str, ord_: int, kind: str | None = "정상공고", **extra) -> Notice:
+    extra = {"pblancOdr": str(ord_), **({"pblancSe": kind} if kind else {}), **extra}
+    return Notice(source="국방전자조달", bid_no=f"D2B-국내경쟁-T{token}{key}-{ord_}", title=f"{token} 국방 {key} {ord_}",
+                  organization="국군어느부대", url="https://www.d2b.go.kr/", extra=extra)
+
+
+@pytest.mark.asyncio
+async def test_d2b_revisions_and_cancel(store):
+    """국방은 정정·취소가 차수(pblancOdr)를 올려 새 행으로 온다 — 나라장터와 같이 최신 차수만, 취소는 낮은 차수까지."""
+    save, rows, new_token = store
+    t = new_token()
+    await save("d2b", [
+        _d2b(t, "A", 1), _d2b(t, "A", 2, "취소공고"),
+        _d2b(t, "B", 1), _d2b(t, "B", 2, "정정공고"),
+        _d2b(t, "C", 1, None, progrsSttus="진행중"),  # 수의 목록 — pblancSe 없음
+        _d2b(t, "D", 1, None, progrsSttus="진행중"), _d2b(t, "D", 2, None, progrsSttus="공개협상취소"),  # 수의 취소
+    ])
+    r = await rows(t)
+    a1, a2 = r[f"D2B-국내경쟁-T{t}A-1"], r[f"D2B-국내경쟁-T{t}A-2"]
+    b1, b2 = r[f"D2B-국내경쟁-T{t}B-1"], r[f"D2B-국내경쟁-T{t}B-2"]
+    assert (a1.superseded, a1.status, a2.superseded, a2.status) == (True, "cancelled", False, "cancelled")
+    assert (b1.superseded, b1.status, b2.superseded, b2.status) == (True, "ongoing", False, "ongoing")
+    assert (r[f"D2B-국내경쟁-T{t}C-1"].superseded, r[f"D2B-국내경쟁-T{t}C-1"].status) == (False, "ongoing")
+    assert [r[f"D2B-국내경쟁-T{t}D-{o}"].status for o in (1, 2)] == ["cancelled", "cancelled"]
+
+
+@pytest.mark.asyncio
+async def test_institution_cancel_marks(store):
+    """LH·가스공사는 같은 bid_no 행이 덮이며 취소가 원문 표시로만 온다 — 표시가 있으면 cancelled, 차수 정리 대상 아님."""
+    save, rows, new_token = store
+    t = new_token()
+
+    def inst(prefix: str, key: str, **extra) -> Notice:
+        return Notice(source=prefix, bid_no=f"{prefix}-T{t}{key}", title=f"{t} {prefix} {key}",
+                      organization="어느공사", url="https://example.or.kr/n", extra=extra)
+
+    await save("lh", [inst("LH", "A", bidKind="취소공고", bidDegree="01"), inst("LH", "B", bidKind="정정공고")])
+    await save("kogas", [inst("KOGAS", "A", CANCEL_YN="취소"), inst("KOGAS", "B", NOTICE_CODE="x")])
+    r = await rows(t)
+    assert {k: (n.status, n.superseded) for k, n in r.items()} == {
+        f"LH-T{t}A": ("cancelled", False), f"LH-T{t}B": ("ongoing", False),
+        f"KOGAS-T{t}A": ("cancelled", False), f"KOGAS-T{t}B": ("ongoing", False),
+    }
 
 
 async def _tenant(client: AsyncClient, keyword: str) -> tuple[dict, int]:

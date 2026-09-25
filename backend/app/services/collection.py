@@ -12,56 +12,77 @@ from app.services.region import normalize_region, notice_region
 
 logger = logging.getLogger("bidwatch.collection")
 
-# 나라장터 공고종류(extra.ntceKindNm) 중 취소 — bidwatch가 원문으로 판정한다 (F-017, 2026-09-25 사용자 결정)
+# 취소는 bidwatch가 extra 원문으로 판정한다 (F-017 — 나라장터 2026-09-25, 기관 출처 2026-09-26 사용자 결정).
+# 출처마다 키가 다르다: 나라장터 ntceKindNm · LH bidKind · 국방 pblancSe = "취소공고", 가스공사 CANCEL_YN = "취소"
+# (bid-collectors v1.4.0 handover), 국방 수의 2종(pblancSe 없음)은 progrsSttus = "공개협상취소"(2026-09-26 실측 288건 중 34 —
+# handover에 없어 bidwatch가 찾음). 수자원은 취소 공고가 API에서 빠져 판정할 게 없다.
 CANCEL_KIND = "취소공고"
+D2B_NEGOTIATION_CANCEL = "공개협상취소"
+_CANCEL_MARKS = (("ntceKindNm", CANCEL_KIND), ("bidKind", CANCEL_KIND), ("pblancSe", CANCEL_KIND), ("CANCEL_YN", "취소"),
+                 ("progrsSttus", D2B_NEGOTIATION_CANCEL))
+
+
+def is_cancel(extra: dict | None) -> bool:
+    extra = extra or {}
+    return any(extra.get(k) == v for k, v in _CANCEL_MARKS)
 
 
 def _status(notice) -> str:
-    if (notice.extra or {}).get("ntceKindNm") == CANCEL_KIND:
-        return "cancelled"
-    return notice.status
+    return "cancelled" if is_cancel(notice.extra) else notice.status
 
 
-# 차수 판정은 extra 원문(bidNtceNo·bidNtceOrd)으로. 행을 한 번 읽어 파이썬에서 계산하고 바뀐 행만 id로 고친다
+# 차수 판정은 extra 원문으로. 행을 한 번 읽어 파이썬에서 계산하고 바뀐 행만 id로 고친다
 # — SQL 한 문장(CTE+UPDATE)은 플래너가 JSONB 조건을 1행으로 오판해 중첩 루프로 20초 걸렸다(6천 행 실측).
+# 차수가 행으로 갈리는 출처는 둘: 나라장터(bidNtceNo·bidNtceOrd), 국방(bid_no "D2B-{구분}-{키}-{pblancOdr}" —
+# 정정·취소는 pblancOdr이 올라 새 행). LH·가스공사는 같은 bid_no 행이 덮이고, 수자원은 재공고가 새 번호라 대상 아님.
 _REVISION_ROWS = """
-    SELECT id, extra->>'bidNtceNo' AS no, extra->>'bidNtceOrd' AS ord,
-           extra->>'ntceKindNm' AS kind, status, superseded
-    FROM bid_notices WHERE source_id = :sid AND extra ? 'bidNtceNo'
+    SELECT id, bid_no, extra->>'bidNtceNo' AS no, extra->>'bidNtceOrd' AS ord, extra->>'pblancOdr' AS d2b_ord,
+           extra->>'ntceKindNm' AS kind, extra->>'pblancSe' AS d2b_kind, extra->>'progrsSttus' AS d2b_progress,
+           status, superseded
+    FROM bid_notices WHERE source_id = :sid AND (extra ? 'bidNtceNo' OR bid_no LIKE 'D2B-%')
 """
 
 
+def _revision_of(row) -> tuple[str, str, bool]:
+    """(공고 키, 차수, 취소공고인가) — 나라장터는 원문 키, 국방은 bid_no에서 차수를 뗀 앞부분."""
+    if row.no:
+        return row.no, row.ord or "", row.kind == CANCEL_KIND
+    cancel = row.d2b_kind == CANCEL_KIND or row.d2b_progress == D2B_NEGOTIATION_CANCEL
+    return row.bid_no.rsplit("-", 1)[0], row.d2b_ord or "", cancel
+
+
 async def refresh_revisions(source_id: int, db: AsyncSession) -> dict:
-    """나라장터 차수 정리 — 수집 저장 직후 출처 전체를 다시 계산한다(재수집이 status를 덮어도 되살아난다).
+    """차수 정리(나라장터·국방) — 수집 저장 직후 출처 전체를 다시 계산한다(재수집이 status를 덮어도 되살아난다).
 
     1. 같은 공고번호에 더 높은 차수가 있으면 superseded (차수는 정수 비교: "009" < "010")
     2. 취소공고 차수와 같거나 낮은 차수는 status=cancelled — 취소 뒤 더 높은 차수(재공고)는 그대로
     3. 이전 차수에 달린 태그 → 최신 차수로. 높은 차수의 태그부터 옮기고, 최신 차수에 그 회사 태그가
        이미 있으면 옮기지 않는다(공고당 태그 1개 — tenant_tags UNIQUE)
-    extra에 bidNtceNo가 없는 출처는 대상 행이 없다. 차수가 숫자가 아닌 행은 판정에서 빼고 경고를 남긴다.
+    차수가 행으로 갈리지 않는 출처는 대상 행이 없다. 차수가 숫자가 아닌 행은 판정에서 빼고 경고를 남긴다.
     """
     groups: dict[str, list] = {}
     bad_ord = 0
     for row in (await db.execute(text(_REVISION_ROWS), {"sid": source_id})).all():
-        if not (row.ord or "").isdigit():
+        key, ord_, cancel = _revision_of(row)
+        if not ord_.isdigit():
             bad_ord += 1
             continue
-        groups.setdefault(row.no, []).append(row)
+        groups.setdefault(key, []).append((int(ord_), cancel, row))
 
     to_supersede, to_unsupersede, to_cancel = [], [], []
     moves: list[tuple[list[int], int]] = []  # (이전 차수 id들 — 높은 차수부터, 최신 차수 id)
     for rows in groups.values():
-        rows.sort(key=lambda r: int(r.ord), reverse=True)
-        latest = rows[0]
-        cancel_ord = max((int(r.ord) for r in rows if r.kind == CANCEL_KIND), default=None)
-        for r in rows:
+        rows.sort(key=lambda x: x[0], reverse=True)
+        latest = rows[0][2]
+        cancel_ord = max((o for o, cancel, _ in rows if cancel), default=None)
+        for o, _, r in rows:
             should = r is not latest
             if should != r.superseded:
                 (to_supersede if should else to_unsupersede).append(r.id)
-            if cancel_ord is not None and int(r.ord) <= cancel_ord and r.status != "cancelled":
+            if cancel_ord is not None and o <= cancel_ord and r.status != "cancelled":
                 to_cancel.append(r.id)
         if len(rows) > 1:
-            moves.append(([r.id for r in rows[1:]], latest.id))
+            moves.append(([r.id for _, _, r in rows[1:]], latest.id))
 
     for ids, value in ((to_supersede, True), (to_unsupersede, False)):
         if ids:

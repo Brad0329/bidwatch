@@ -15,6 +15,7 @@ from app.models.notice import BidNotice, SystemSource
 from app.services.collection import upsert_bid_notices
 
 EXPECTED = {"nara": "bid", "nara_prespec": "bid", "alio": "bid",
+            "lh": "bid", "kogas": "bid", "d2b": "bid", "kwater": "bid",  # 자체조달 기관 (007)
             "kstartup": "support", "bizinfo": "support", "smes": "support", "subsidy24": "support"}
 
 

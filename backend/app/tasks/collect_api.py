@@ -27,6 +27,11 @@ COLLECTOR_MAP = {
     "subsidy24": ("bid_collectors.subsidy24", "Subsidy24Collector", "DATA_GO_KR_KEY"),
     "smes": ("bid_collectors.smes", "SmesCollector", "DATA_GO_KR_KEY"),
     "alio": ("bid_collectors.alio", "AlioCollector", None),  # 공개 JSON — API 키 없음 (bid-collectors v1.2.0)
+    # 자체조달 기관 (bid-collectors v1.4.0, 마이그레이션 007) — data.go.kr 한도는 오퍼레이션별이라 나라장터와 나눠 쓰지 않는다
+    "lh": ("bid_collectors.lh", "LhCollector", "DATA_GO_KR_KEY"),
+    "kogas": ("bid_collectors.kogas", "KogasCollector", "DATA_GO_KR_KEY"),
+    "d2b": ("bid_collectors.d2b", "D2bCollector", "DATA_GO_KR_KEY"),
+    "kwater": ("bid_collectors.kwater", "KwaterCollector", "DATA_GO_KR_KEY"),
 }
 
 # nara 수집 시 사전규격도 같이 수집

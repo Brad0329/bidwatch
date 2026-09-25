@@ -226,6 +226,9 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
           {isNara ? (
             /* 나라장터 전용 */
             <NaraExtra ex={ex} bidNo={notice.bid_no} />
+          ) : institutionOf(notice.bid_no) ? (
+            /* 자체조달 기관 (LH·가스공사·국방·수자원, bid-collectors v1.4.0) */
+            <InstitutionExtra ex={ex} kind={institutionOf(notice.bid_no)!} />
           ) : (
             /* K-Startup / 기업마당 / 중소벤처기업부 등 */
             <GeneralExtra ex={ex} />
@@ -490,6 +493,113 @@ function NaraExtra({ ex, bidNo }: { ex: Extra; bidNo: string }) {
   );
 }
 
+/* 자체조달 기관 — bid_no 접두사로 가린다(출처 이름은 바꿀 수 있어서). 키의 뜻: docs/source_fields.md 기관 출처 절 */
+type Institution = "LH" | "KOGAS" | "D2B" | "KWATER";
+
+function institutionOf(bidNo: string): Institution | null {
+  const prefix = bidNo.split("-")[0];
+  return (["LH", "KOGAS", "D2B", "KWATER"] as const).find((p) => p === prefix) ?? null;
+}
+
+/* 금액은 이름별로 늘 보인다 — 값이 없으면 "-" (2026-09-26 사용자 요청). budget은 bid-collectors가 비워 둔다 */
+function amount(v: unknown): string {
+  return formatPrice(v) ?? "-";
+}
+
+/* 국방 "202609281030"·"20260928" → "2026-09-28 10:30". 그 밖의 형식은 그대로 */
+function dt(v: unknown): string | null {
+  const s = text(v);
+  if (!s) return null;
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})(?:(\d{2})(\d{2}))?$/);
+  if (!m) return s;
+  return `${m[1]}-${m[2]}-${m[3]}` + (m[4] ? ` ${m[4]}:${m[5]}` : "");
+}
+
+/* LH 필요 면허 — req{n}Reqlic{k}Nm(면허 이름)·req{n}MvgbNm(주/부업종)·req{n}LicctNm(등록 조건) */
+function lhLicenses(ex: Extra): Row[] {
+  const rows: Row[] = [];
+  for (let n = 1; n <= 5; n++) {
+    const names = [1, 2, 3, 4, 5].map((k) => text(ex[`req${n}Reqlic${k}Nm`])).filter(Boolean);
+    if (names.length === 0) continue;
+    const cond = text(ex[`req${n}LicctNm`]);
+    rows.push([`필요 면허 ${text(ex[`req${n}MvgbNm`]) ?? n}`, names.join(", ") + (cond ? ` — ${cond}` : "")]);
+  }
+  return rows;
+}
+
+function InstitutionExtra({ ex, kind }: { ex: Extra; kind: Institution }) {
+  let title: string;
+  let amounts: Row[] = [];
+  let rows: Row[];
+  if (kind === "LH") {
+    title = "LH 상세";
+    amounts = [
+      ["추정 가격", amount(ex.presmtPrc)], ["설계가", amount(ex.designPrc)],
+      ["기초 금액", amount(ex.fdmtlAmt)], ["부가세", amount(ex.addtTax)],
+    ];
+    const kindNm = text(ex.bidKind);
+    const zones = [1, 2, 3, 4].map((i) => text(ex[`zoneRstrct${i}`])).filter(Boolean).join(", ");
+    rows = [
+      ["공고 종류", kindNm && kindNm !== "일반공고" ? kindNm : null],
+      ["업무 구분", text(ex.cstrtnJobGbNm)],
+      ["계약 방법", text(ex.tndrCtrctMedCd)],
+      ["낙찰자 선정", text(ex.sunjungNm)],
+      ["공동수급", text(ex.gongdongNm)],
+      ["입찰서 접수", [dt(ex.tndrdocAcptBgninDtm), dt(ex.tndrdocAcptEndDtm)].filter(Boolean).join(" ~ ") || null],
+      ["개찰 일시", dt(ex.openDtm)],
+      ["지역 제한", zones || null],
+      ["담당 본부", text(ex.zoneHqCd)?.replace(/\s+/g, "") ?? null],
+      ...lhLicenses(ex),
+      ["업종 제한", text(ex.antbsncatRstrctFg)],
+    ];
+  } else if (kind === "D2B") {
+    title = "국방전자조달 상세";
+    amounts = [
+      ["기초예비가격", amount(ex.bsicExpt)], ["기초 금액", amount(ex.baseAmnt)], ["예산", amount(ex.budgetAmount)],
+    ];
+    rows = [
+      ["공고 구분", text(ex.pblancSe)],
+      ["진행 상태", text(ex.progrsSttus)],
+      ["계약 방법", text(ex.cntrctMth)],
+      ["입찰 방법", text(ex.bidMth)],
+      ["집행 유형", text(ex.excutTy)],
+      ["참가등록 마감", dt(ex.bidPartcptRegistClosDt)],
+      ["입찰서 마감", dt(ex.biddocPresentnClosDt) ?? dt(ex.bidRegistClosDt)],
+      ["견적서 마감", dt(ex.prqudoPresentnClosDt)],
+      ["협상 예정일", dt(ex.ntatPlanDate)],
+      ["개찰 일시", dt(ex.opengDt)],
+      ["기초가격 공개", text(ex.bsisPrdprcOthbcAt)],
+    ];
+  } else if (kind === "KWATER") {
+    title = "수자원공사 상세";
+    // 예정가격 0은 "미공개"(2026-09-26 사용자 결정 — 실측 51건 중 41건이 0)
+    const plan = text(ex.tndrPlnprc);
+    amounts = [["예정 가격", plan !== null && Number(plan) === 0 ? "미공개" : amount(plan)]];
+    rows = [
+      ["계약 구분", text(ex.cntrctDivNm)],
+      ["계약 방법", text(ex.ctrmthdCdNm)],
+      ["진행 상태", text(ex.tndrStat)],
+      ["계약 부서", text(ex.cntrctDeptNm)],
+      ["담당자", text(ex.intnChargerNm)],
+    ];
+  } else {
+    // 가스공사 API에는 금액 필드가 없다 — 금액 섹션을 두지 않는다
+    title = "가스공사 상세";
+    rows = [
+      ["업무 구분", text(ex.WORK_TYPE_NAME)],
+      ["계약 방법", text(ex.CONT_METHOD_NAME)],
+      ["입찰 방식", text(ex.BID_TYPE_NAME)],
+      ["개찰 일시", text(ex.OPEN_DT)],
+    ];
+  }
+  return (
+    <>
+      {amounts.length > 0 && <ExtraSection title="금액" rows={amounts} />}
+      <ExtraSection title={title} rows={rows} />
+    </>
+  );
+}
+
 /* K-Startup / 기업마당 — 출처끼리 키가 겹치지 않아 한 목록으로 둔다 */
 function GeneralExtra({ ex }: { ex: Extra }) {
   const rows: Row[] = [
@@ -529,6 +639,7 @@ const ORIGIN_SITES: [string, string][] = [
   ["kwater.or.kr", "수자원공사 전자입찰"],
   ["lh.or.kr", "LH 전자조달"],
   ["khnp.co.kr", "한수원 전자입찰"],
+  ["kogas.or.kr", "가스공사 전자입찰"],
 ];
 
 /* 알리오 refrUrl 원문 → 링크 주소. 원문 전달 원칙이라 보정은 표시 쪽 몫(bid-collectors institution_sources.md §5 실측):

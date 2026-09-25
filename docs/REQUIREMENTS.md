@@ -69,6 +69,12 @@
   - [x] DB의 모든 collector_type이 수집기 매핑에 있고 실제로 생성된다(알리오는 키 없이) →
     `test_every_system_source_has_a_constructible_collector` · `test_alio_collector_needs_no_api_key`
   - [x] 관리자설정에 "알리오 공공기관 입찰공고"가 나오고, 구독 → 수집 → 공고 목록에 기관명과 함께 나온다 (사용자 실테스트 — 2026-09-24 확인)
+- **자체조달 기관 출처 4개 (2026-09-26, 마이그레이션 007 · bid-collectors v1.4.0)**: LH 입찰공고(`lh`)·한국가스공사 입찰공고(`kogas`)·
+  국방전자조달 입찰공고(`d2b`)·한국수자원공사 입찰공고(`kwater`) — 입찰 묶음, 키는 `DATA_GO_KR_KEY`(한도는 오퍼레이션별이라 나라장터와 나눠 쓰지 않는다).
+  알리오와 같은 공고가 두 번 보이는 것은 F-014 때 푼다(잇는 키: handover v1.4.0 §2 #5). 한전 계열은 전력데이터개방포털 키 발급 후.
+  - [x] 네 출처가 수집기 매핑에 있고 생성된다 → `test_every_system_source_has_a_constructible_collector`(DB의 모든 collector_type을 돈다)
+  - [ ] 관리자설정 "입찰 공고" 묶음에 네 출처가 나오고, 구독 → 수집 → 공고 목록에 나온다. 상세에 "금액"(이름별, 없으면 `-`, 수자원 예정가격 0은
+    "미공개", 가스공사는 금액 없음)과 기관별 상세(계약 방법·개찰 일시·LH 지역 제한·필요 면허 등)가 보인다 (사용자 실테스트)
 - **출처 묶음 — 입찰 공고 / 지원사업(선택) (2026-09-25, 목업 "이대로")**: 묶음의 정의는 `backend/app/services/source_category.py`
   한 곳(API의 `category`·`source_category`로 내려간다 — 화면에 같은 목록을 두지 않는다). 새 회사는 아무 출처도 구독하지 않은 채 시작한다.
   - [x] 출처 목록 API가 출처마다 category를 준다 — 나라장터·사전규격·알리오 = bid, K-Startup·기업마당·중소벤처기업부·보조금24 = support.
@@ -234,6 +240,13 @@
   - [x] 태그 필터가 있으면(검토요청 화면 등) 취소·이전 차수 행도 나온다 → 같은 테스트
   - [x] 새 차수가 오면 이전 차수의 태그가 최신 차수로 옮겨가고, 최신 차수에 이미 태그가 있으면 옮기지 않는다 → `test_tag_moves_to_latest_revision`
   - [ ] 목록(검토요청 등 태그 화면)·상세에서 취소 공고는 "취소" 배지로 보인다 (사용자 실테스트)
+- **기관 출처로 확장 (2026-09-26 사용자 결정 "출처 추가와 함께", bid-collectors v1.4.0)**: 규칙은 위와 같고 원문 키만 다르다 —
+  구현 한 곳 `services/collection.py`(`_CANCEL_MARKS`·`_revision_of`). 국방은 정정·취소가 `pblancOdr`을 올려 새 행으로 온다(같은 공고 =
+  bid_no에서 끝 차수를 뗀 앞부분). LH·가스공사는 같은 bid_no 행이 덮여 차수 정리 대상이 아니고 취소 표시만 본다. 수자원은 취소 공고가 API에서 빠진다.
+  실측(7일): 국방 418행 중 이전 차수 27 · 취소 55(취소공고 12 + 낮은 차수 9 + 수의 "공개협상취소" 34), LH 취소 2, 가스공사 취소 3.
+  - [x] 국방: 같은 공고의 낮은 차수는 `superseded`, 취소공고(`pblancSe`) 또는 수의 `progrsSttus=공개협상취소`면 그 차수 이하가 `cancelled`,
+    정정공고는 취소가 아니다 → `test_d2b_revisions_and_cancel`
+  - [x] LH `bidKind=취소공고`·가스공사 `CANCEL_YN=취소`면 `cancelled`, 차수 정리(superseded)는 걸리지 않는다 → `test_institution_cancel_marks`
 - **상태**: 진행 (실테스트 대기)
 
 ### F-018: 사전규격 ↔ 본 공고 연결

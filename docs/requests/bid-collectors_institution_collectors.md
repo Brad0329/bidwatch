@@ -45,6 +45,14 @@ API 번호는 `procurement_sources_research.md` 3절 표 — **전부 문서상,
 - 알리오와 같은 공고가 두 번 나오는 문제 → F-014(중복 공고 묶음)와 함께 설계. 그 전까지는 둘 다 보인다.
 - 기관별 상세 표시(나라장터 상세처럼) — `docs/source_fields.md`에 필드 사전 추가.
 
+## 4-1. ① 조사 결과에 대한 사용자 결정 (2026-09-26)
+- 조사 결과: `bid-collectors/docs/institution_sources.md`(2026-09-25 본 실측, `07d355a`). §3 "1,000회 공유" 전제는 틀렸다
+  (한도는 오퍼레이션별) — 위 ②의 해당 문장은 무시한다.
+- **② 구현 대상: LH · 국방 d2b · 가스공사 · 수자원** (4곳 모두). 순서는 조사 추천대로 LH → d2b → 가스 → 수자원을 권하되 bid-collectors가 정한다.
+- **한전 + 발전 5사 + KPS**: 사용자가 전력데이터개방포털 키를 발급받을 예정 — 발급되면 실측 후 구현(키는 `.env`에만).
+- 코레일(비공식 경로) 보류 · 한수원 알리오 유지.
+- 평일 건수·등록 지연은 연휴 뒤(9/29 이후) 재측정해 handover에 적어 달라 — BidWatch 정기 수집(Phase 009) 창 길이를 거기에 맞춘다.
+
 ## 5. 함께 볼 것
 - `bidwatch/docs/procurement_sources_research.md` (3절 기관 표, 3-1 알리오, 3-2 자체전자조달 파일 대조)
 - `bidwatch/docs/source_fields.md` 부록 A — bid-collectors 결함·불일치 10건(별건, 전달 대기)
