@@ -171,6 +171,11 @@
   → 어젯밤 올라온 공고가 상세에서 "마감"으로 보인다. **2026-09-25 사용자 결정 ②: URL 출처 공고는 상세 배지를 숨긴다**
   (bid-collectors 계약은 그대로). 목록 API `status` 필터는 URL 출처에 여전히 게시일 기준 값으로 걸린다 — 화면이 이 필터를
   쓰게 되면 URL 출처를 필터에서 빼야 한다.
+- **알리오 상세 보강 — bid-collectors 대기 (2026-09-25)**: 요청서 `docs/requests/bid-collectors_alio_fetch_detail.md`를 bid-collectors
+  세션에 넘긴다 → handover가 오면 bidwatch 구현(수용 기준 REQUIREMENTS F-007 "알리오 상세 보강"). 목업 확인 완료("이대로").
+  같은 날 판단: 알리오를 기관별 수집기(한전·수자원·LH·한수원)로 대체하지 않는다 — 알리오에만 있는 공고 772건(9/18~24)이 64개 기관에
+  흩어져 있고 넷은 47%(코레일 포함 5곳 60%, 80%엔 16곳). 기관 수집기는 알리오에 없는 곳(국방 d2b·한전 계열 수의계약)부터 보완용으로.
+  실측 `scripts/_tmp/alio_non_nara.py`(제목 정확 일치 근사 — 겹침 과소 추정 가능).
 - **bid-collectors 결함·불일치 10건 (2026-09-25 필드 사전 조사, `docs/source_fields.md` 부록 A)** — bid-collectors에 전달 대기.
   BidWatch에 닿는 것: 공사 budget=추정가격(A-5), region 원천이 기관명(A-6 — 공사는 BidWatch가 현장 지역으로 해결), K-Startup organization
   폴백이 기관 유형(A-7), cancelled 미생성(A-8 — BidWatch가 원문으로 해결, F-017).
