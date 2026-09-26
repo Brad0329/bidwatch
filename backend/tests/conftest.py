@@ -1,6 +1,6 @@
 import sys
 import asyncio
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -19,9 +19,9 @@ async def client():
     db_mod._async_session = None
 
     # Mock Celery dispatch to avoid Redis dependency in tests
-    with patch("app.routers.sources._dispatch_analysis") as mock_dispatch, \
-         patch("app.routers.admin.collect_single_source_task", create=True) as mock_task, \
-         patch("app.routers.admin.collect_public_api_task", create=True) as mock_task2:
+    with patch("app.routers.sources._dispatch_analysis"), \
+         patch("app.routers.admin.collect_single_source_task", create=True), \
+         patch("app.routers.admin.collect_public_api_task", create=True):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac

@@ -6,7 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   sourceId: number;
-  sourceName: string;
   lastCollectedAt: string | null;
 }
 
@@ -28,7 +27,6 @@ function calcDays(fromDate: string): number {
 
 export default function CollectionButton({
   sourceId,
-  sourceName,
   lastCollectedAt,
 }: Props) {
   // 초기값은 첫 렌더에 한 번만 — 렌더 중 Date.now() 호출 금지(react-hooks/purity)

@@ -81,7 +81,6 @@ export default function SourceList({ showCollection = false }: Props) {
               <div className="px-5 pb-4 pt-0">
                 <CollectionButton
                   sourceId={source.id}
-                  sourceName={source.name}
                   lastCollectedAt={source.last_collected_at}
                 />
               </div>

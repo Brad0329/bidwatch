@@ -127,8 +127,9 @@
 
 - **`/debt-audit` 2026-09-26 (Phase 008 이후 첫 회) — 사용자 결정: ② 곁가지(항목별 커밋), 보안 결함·v1.5.0 먼저.**
   목록 원문은 이 세션 보고(반복 실수 7·중복 로직 22·복수 원본 17). 처리 상태:
-  - 완료: 리프레시 토큰을 Bearer로 받던 결함(`e5ad9d9`) · handover v1.5.0 반영(`04cd87d`) · ① 이미 어긋난 문서 9건
-  - 진행 예정(권고 순서): ② 기존 lint 경고 `CollectionButton.tsx` `sourceName`(8커밋째 방치) ③ ruff로 `datetime.utcnow`
+  - 완료: 리프레시 토큰을 Bearer로 받던 결함(`e5ad9d9`) · handover v1.5.0 반영(`04cd87d`) · ① 이미 어긋난 문서 9건(`9b128ed`) ·
+    `except ImportError: pass`(`02e4162`) · ② lint 경고 0 — 프론트 `--max-warnings 0`으로 강제, 백엔드 ruff 0
+  - 진행 예정(권고 순서): ③ ruff로 `datetime.utcnow`
     금지 + bid_notices upsert 시각 테스트 ④ `COLLECTOR_MAP`↔system_sources↔상세 조회 여부 대조 테스트
   - 미착수(사용자가 고를 것): 테스트 전용 DB(일반 — 아래 항목) · 사전규격 목록 정렬·취소 제외 누락(`notices.py:291`) · 비밀번호 길이 백엔드 검증 ·
     미리보기 URL 사전 확인 · `clean_title` 공공 출처 미적용(일반) · 취소 판정 두 벌(일반) · upsert 두 벌의 new/updated 건수 오류 ·
