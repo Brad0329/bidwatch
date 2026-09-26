@@ -1,6 +1,6 @@
 # 출처 필드 사전 — bid-collectors가 넘기는 값의 의미
 
-> 작성 2026-09-25 · bid-collectors **v1.2.5** 기준. 출처별로 실제 호출(소량)과 공식 명세를 대조해 만들었다.
+> 작성 2026-09-25 · bid-collectors **v1.2.5** 기준(이후 절마다 버전 표시 — 9절 C-2 v1.3.0, 11절 v1.4.0, 11-2 v1.5.0). 출처별로 실제 호출(소량)과 공식 명세를 대조해 만들었다.
 > - **키가 무엇이 오는가**의 정답은 실측과 코드(`bid_collectors/*.py`)다. **키가 무슨 뜻인가**의 근거는 명세다.
 >   명세·화면으로 확인하지 못한 뜻은 반드시 **추정**으로 표시한다.
 > - bid-collectors handover가 표준 필드의 원천이나 `extra`를 바꾸면 이 문서의 해당 절을 같은 작업에서 고친다.
@@ -461,6 +461,18 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 - LH 면허: `req{n}Reqlic{k}Nm`(면허 이름) · `req{n}MvgbNm`(주/부업종) · `req{n}LicctNm`(등록 조건 문장) — 12/52건. 지역 제한 `zoneRstrct1~4` 6건.
   `vndrrstrctNm1`(5건, 값 "경기" 등)은 뜻이 확인되지 않아 표시하지 않는다.
 - 재현: `scripts/_tmp/inst_extra_keys.py`(키별 출현·예시) · `inst_value_counts.py <type> <key>` · `collect_institutions.py [days]`.
+
+### 11-2. 상세 조회로 더해지는 키 (bid-collectors v1.5.0 `fetch_detail`, 팝업을 열 때 1회 병합)
+- 키 목록·뜻의 원본은 `docs/interface.md` "기관 수집기 `fetch_detail` (v1.5.0)"와 handover v1.5.0 §1 — 여기는 **BidWatch 실측과 화면이 쓰는 키**만.
+- 실측 2026-09-26(`scripts/_tmp/inst_detail_probe.py` — 수자원 4·LH 3·가스 3·국방 6건, 호출 16회): 15건 성공, **국방 1건 예외**
+  (`D2B-국내경쟁-2026LCH006737411-2`, "결과 없음" — 2차수 공고. 팝업은 뜨고 경고 로그, 다음 열기에 재시도).
+- **handover와 다른 것**: 국방 `lcnsLmttList`·`areaLmttList`의 구분자가 `^`(국내경쟁)만이 아니라 **`|`(시설경쟁)**도 온다 — 화면은 둘 다로 나눈다.
+- 수자원: `rqestAmt`(요청금액, **정수**로 온다) · `tndrPrgsOrdrList`(`prgsDivNm`·`strtDt`·`closDt` = `YYYYMMDDHHMM`) · `intnChargerTelno`·`intnChargerEmail`(대문자) ·
+  `tndrMthNm`·`sucbidrDcsnMthCdNm`·`lmttMthCdNm`(제한경쟁일 때만) · `tndrPlaceInfo` · `tndrQualfAtpn`(줄바꿈 있는 문장). `tndrStatus`(`NORMAL_OK`/`DATA_ERR`)는 뜻 미확인 — 표시 안 함.
+- LH: `표 이름/항목명` 키. 금액은 `"180,075,000원 (일억…원)"` 문자열(화면은 숫자만 추려 표시) · `요구면허`(list, `주/부구분`·`요구면허1`·`업종`) — 목록 `req{n}…` 키가 없을 때만 쓴다.
+- 가스공사: 화면 항목명 키. 견적 공고는 `견적방법` 키가 있고 `추정가격`이 가짜 값(30 등)이라 화면은 금액 대신 "견적 공고 — 추정가격 없음". 개찰 전에는 `개찰일시`가 `-입찰마감후 저장-`로 온다.
+  제한이 없을 때 `면허사항제한`은 `업종그룹1 - 업종그룹2 - …` 빈 틀로 온다.
+- 국방: `estmPrce`(추정가격, 수의 일부 없음) · `scsbidLwltRt`·`asessRtLwlt/Uplmt`(0 = 해당 없음) · `chargerNm`·`chargerCttpc` · 시설 `lc`·`cntrwkPd`·원가 항목(표시 안 함) · `bsnsDcMeetngDt/Place`(설명회, 일부).
 
 ---
 

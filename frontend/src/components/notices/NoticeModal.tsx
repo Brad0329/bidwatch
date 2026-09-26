@@ -430,8 +430,9 @@ function ExtraSection({ title, rows }: { title: string; rows: Row[] }) {
     <div>
       <h3 className="text-sm font-semibold text-gray-700 mb-2">{title}</h3>
       <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-        {shown.map(([label, value]) => (
-          <InfoRow key={label} label={label} value={value} />
+        {shown.map(([label, value], i) => (
+          // 같은 이름의 행이 올 수 있다(필요 면허 "주" 둘 등) — 순번을 키에 섞는다
+          <InfoRow key={`${label}-${i}`} label={label} value={value} />
         ))}
       </div>
     </div>
@@ -527,75 +528,179 @@ function lhLicenses(ex: Extra): Row[] {
   return rows;
 }
 
+/* 상세(fetch_detail, bid-collectors v1.5.0) 원문의 빈 표기 — 가스공사는 "()"·"~"·"%,"를 그대로 준다 */
+function filled(v: unknown): string | null {
+  const s = text(v);
+  return s && !/^[\s()~%,.\-]*$/.test(s) ? s : null;
+}
+
+/* 담당자 이름 + 연락처 한 줄 */
+function person(name: unknown, contact: unknown): string | null {
+  return [filled(name), filled(contact)].filter(Boolean).join(" ") || null;
+}
+
+/* 국방 지역·면허 제한 목록 — 원문 구분자가 "^"(국내)와 "|"(시설) 둘 다 온다(2026-09-26 실측) */
+function splitList(v: unknown): string | null {
+  const s = text(v);
+  return s ? s.split(/[\^|]/).map((x) => x.trim()).filter(Boolean).join(" · ") : null;
+}
+
+/* 수자원 입찰 일정 — tndrPrgsOrdrList [{prgsDivNm, strtDt, closDt}] (상세에만 있다) */
+function kwaterSchedule(ex: Extra): Row[] {
+  const list = Array.isArray(ex.tndrPrgsOrdrList) ? (ex.tndrPrgsOrdrList as Extra[]) : [];
+  return list.map((step, i): Row => [
+    text(step.prgsDivNm) ?? `단계 ${i + 1}`,
+    [dt(step.strtDt), dt(step.closDt)].filter(Boolean).join(" ~ ") || null,
+  ]);
+}
+
+/* LH 상세의 요구면허 표 — [{"주/부구분", "요구면허1", "업종"}]. 목록의 req{n}Reqlic 키가 없을 때만 쓴다 */
+function lhDetailLicenses(ex: Extra): Row[] {
+  const list = Array.isArray(ex["요구면허"]) ? (ex["요구면허"] as Extra[]) : [];
+  return list.map((r, i): Row => [
+    `필요 면허 ${text(r["주/부구분"]) ?? i + 1}`,
+    [text(r["요구면허1"]), text(r["업종"])].filter(Boolean).join(" — ") || null,
+  ]);
+}
+
 function InstitutionExtra({ ex, kind }: { ex: Extra; kind: Institution }) {
   let title: string;
   let amounts: Row[] = [];
   let rows: Row[];
+  let schedule: Row[] = [];
+  // 목록(수집 시) 키가 먼저, 없으면 상세(팝업을 처음 열 때 받는다) 키 — 상세 키 이름은 원문 그대로(handover v1.5.0 §1)
   if (kind === "LH") {
     title = "LH 상세";
+    const d = (k: string) => ex[`공고일반정보/${k}`];
     amounts = [
-      ["추정 가격", amount(ex.presmtPrc)], ["설계가", amount(ex.designPrc)],
-      ["기초 금액", amount(ex.fdmtlAmt)], ["부가세", amount(ex.addtTax)],
+      ["추정 가격", amount(text(ex.presmtPrc) ?? d("추정가격"))], ["설계가", amount(text(ex.designPrc) ?? d("설계가격"))],
+      ["기초 금액", amount(text(ex.fdmtlAmt) ?? d("기초금액"))], ["부가세", amount(text(ex.addtTax) ?? d("부가가치세"))],
     ];
     const kindNm = text(ex.bidKind);
-    const zones = [1, 2, 3, 4].map((i) => text(ex[`zoneRstrct${i}`])).filter(Boolean).join(", ");
+    const zones = [1, 2, 3, 4].map((i) => text(ex[`zoneRstrct${i}`]) ?? text(ex[`투찰제한정보/참가지역${i}`]))
+      .filter(Boolean).join(", ");
+    const licenses = lhLicenses(ex);
     rows = [
       ["공고 종류", kindNm && kindNm !== "일반공고" ? kindNm : null],
-      ["업무 구분", text(ex.cstrtnJobGbNm)],
-      ["계약 방법", text(ex.tndrCtrctMedCd)],
-      ["낙찰자 선정", text(ex.sunjungNm)],
-      ["공동수급", text(ex.gongdongNm)],
-      ["입찰서 접수", [dt(ex.tndrdocAcptBgninDtm), dt(ex.tndrdocAcptEndDtm)].filter(Boolean).join(" ~ ") || null],
-      ["개찰 일시", dt(ex.openDtm)],
+      ["업무 구분", text(ex.cstrtnJobGbNm) ?? text(d("업종유형"))],
+      ["계약 방법", text(ex.tndrCtrctMedCd) ?? text(ex["계약및입찰방식정보/계약방법"])],
+      ["낙찰자 선정", text(ex.sunjungNm) ?? text(ex["계약및입찰방식정보/낙찰자선정방법"])],
+      ["공동수급", text(ex.gongdongNm) ?? text(ex["입찰진행정보/공동수급협정서 접수/구성 방식"])],
       ["지역 제한", zones || null],
+      ["공고 부서", text(d("공고부서"))],
       ["담당 본부", text(ex.zoneHqCd)?.replace(/\s+/g, "") ?? null],
-      ...lhLicenses(ex),
+      ...(licenses.length > 0 ? licenses : lhDetailLicenses(ex)),
       ["업종 제한", text(ex.antbsncatRstrctFg)],
+    ];
+    schedule = [
+      ["입찰서 접수",
+        [dt(ex.tndrdocAcptBgninDtm) ?? text(ex["입찰진행정보/입찰서접수개시일시"]),
+          dt(ex.tndrdocAcptEndDtm) ?? text(ex["입찰진행정보/입찰서접수마감일시"])].filter(Boolean).join(" ~ ") || null],
+      ["개찰 일시", dt(ex.openDtm) ?? text(ex["입찰진행정보/개찰일시"])],
+      ["재입찰", text(ex["입찰진행정보/재입찰"])],
     ];
   } else if (kind === "D2B") {
     title = "국방전자조달 상세";
     amounts = [
+      ["추정 가격", amount(ex.estmPrce)],
       ["기초예비가격", amount(ex.bsicExpt)], ["기초 금액", amount(ex.baseAmnt)], ["예산", amount(ex.budgetAmount)],
     ];
+    const lwlt = text(ex.scsbidLwltRt);
+    const lo = text(ex.asessRtLwlt);
+    const hi = text(ex.asessRtUplmt);
+    const briefing = [dt(ex.bsnsDcMeetngDt), text(ex.bsnsDcMeetngPlace)].filter(Boolean).join(" · ");
     rows = [
       ["공고 구분", text(ex.pblancSe)],
       ["진행 상태", text(ex.progrsSttus)],
       ["계약 방법", text(ex.cntrctMth)],
       ["입찰 방법", text(ex.bidMth)],
+      ["낙찰 방법", text(ex.sucbidrDecsnMth)],
+      // 0은 "해당 없음"으로 온다(실측 — 최저가격제 공고의 하한율 0.000, 사정률 0.00~0.00)
+      ["낙찰하한율", lwlt && Number(lwlt) !== 0 ? `${lwlt}%` : null],
+      ["사정률", lo && hi && !(Number(lo) === 0 && Number(hi) === 0) ? `${lo}% ~ ${hi}%` : null],
       ["집행 유형", text(ex.excutTy)],
-      ["참가등록 마감", dt(ex.bidPartcptRegistClosDt)],
+      ["공사 현장", text(ex.lc)],
+      ["공사 기간", filled(ex.cntrwkPd)],
+      ["지역 제한", splitList(ex.areaLmttList)],
+      ["면허 제한", splitList(ex.lcnsLmttList)],
+      ["입찰 장소", text(ex.bidPlace)],
+      ["담당자", person(ex.chargerNm, ex.chargerCttpc)],
+      ["기초가격 공개", text(ex.bsisPrdprcOthbcAt)],
+    ];
+    schedule = [
+      ["참가등록 마감", dt(ex.bidPartcptRegistClosDt) ?? dt(ex.bidPartcptReqstClosDt)],
       ["입찰서 마감", dt(ex.biddocPresentnClosDt) ?? dt(ex.bidRegistClosDt)],
       ["견적서 마감", dt(ex.prqudoPresentnClosDt)],
+      ["사업 설명회", briefing || null],
       ["협상 예정일", dt(ex.ntatPlanDate)],
       ["개찰 일시", dt(ex.opengDt)],
-      ["기초가격 공개", text(ex.bsisPrdprcOthbcAt)],
     ];
   } else if (kind === "KWATER") {
     title = "수자원공사 상세";
     // 예정가격 0은 "미공개"(2026-09-26 사용자 결정 — 실측 51건 중 41건이 0)
     const plan = text(ex.tndrPlnprc);
-    amounts = [["예정 가격", plan !== null && Number(plan) === 0 ? "미공개" : amount(plan)]];
+    amounts = [
+      ["요청 금액", amount(ex.rqestAmt)],
+      ["예정 가격", plan !== null && Number(plan) === 0 ? "미공개" : amount(plan)],
+    ];
     rows = [
       ["계약 구분", text(ex.cntrctDivNm)],
       ["계약 방법", text(ex.ctrmthdCdNm)],
+      ["제한 방법", text(ex.lmttMthCdNm)],
+      ["입찰 방법", text(ex.tndrMthNm)],
+      ["낙찰자 결정", text(ex.sucbidrDcsnMthCdNm)],
       ["진행 상태", text(ex.tndrStat)],
       ["계약 부서", text(ex.cntrctDeptNm)],
-      ["담당자", text(ex.intnChargerNm)],
+      ["담당자", person(ex.intnChargerNm, ex.intnChargerTelno)],
+      ["담당자 이메일", text(ex.intnChargerEmail)?.toLowerCase() ?? null],
+      ["입찰 장소", text(ex.tndrPlaceInfo)],
+      ["참가 자격 유의", text(ex.tndrQualfAtpn)],
     ];
+    schedule = kwaterSchedule(ex);
   } else {
-    // 가스공사 API에는 금액 필드가 없다 — 금액 섹션을 두지 않는다
     title = "가스공사 상세";
+    // 금액은 상세에만 있다. 견적 공고의 추정가격은 1·30 같은 가짜 값("별도 산정 금액이 아님")이라 보이지 않는다
+    // (handover v1.5.0 §1 — 표본 26건 중 13건). 견적 공고는 "견적방법" 키로 가린다
+    const quote = filled(ex["견적방법"]);
+    if (quote) {
+      amounts = [["금액", "견적 공고 — 추정가격 없음"]];
+    } else if (filled(ex["추정가격"]) || filled(ex["합계금액"])) {
+      amounts = [
+        ["추정 가격", amount(ex["추정가격"])], ["부가세", amount(ex["부가세"])], ["합계 금액", amount(ex["합계금액"])],
+      ];
+    }
+    // 취소 공고는 진행상태가 "공고중"으로 남고 진행안내에만 취소가 적힌다(handover v1.5.0 §1)
+    const guide = filled(ex["진행안내"]);
+    const licenses = filled(ex["면허사항제한"]);
     rows = [
-      ["업무 구분", text(ex.WORK_TYPE_NAME)],
-      ["계약 방법", text(ex.CONT_METHOD_NAME)],
+      ["업무 구분", text(ex.WORK_TYPE_NAME) ?? filled(ex["업무구분"])],
+      ["계약 방법", text(ex.CONT_METHOD_NAME) ?? filled(ex["계약방법"])],
       ["입찰 방식", text(ex.BID_TYPE_NAME)],
-      ["개찰 일시", text(ex.OPEN_DT)],
+      ["견적 방법", quote],
+      ["진행 상태", guide?.includes("취소") ? "취소" : filled(ex["진행상태"])],
+      ["예정가격 결정", filled(ex["예정가격결정방식"])],
+      ["도급 형태", filled(ex["도급형태"])],
+      ["지역 제한", filled(ex["지역제한"])],
+      // 제한이 없으면 "업종그룹1 - 업종그룹2 - …" 빈 틀만 온다
+      ["면허 제한", licenses && !/^(업종그룹\d\s*-\s*)+$/.test(licenses) ? licenses : null],
+      ["납품 장소", filled(ex["납품장소"])],
+      ["계약 기간", filled(ex["계약기간"])],
+      ["계약 담당", person(ex["계약담당(공고등록,개찰)"], ex["계약담당 연락처"])],
+      ["규격 담당", person(ex["규격담당(소요부서)"], ex["규격담당 연락처"])],
+    ];
+    schedule = [
+      ["공고 일시", filled(ex["공고일시"])],
+      // 공고 부류마다 마감 항목 이름이 다르다(handover v1.5.0 §1)
+      ["입찰 마감", filled(ex["입찰신청및입찰마감일시"]) ?? filled(ex["입찰마감"])],
+      ["개찰 일시", text(ex.OPEN_DT) ?? filled(ex["개찰일시"])],
+      ["개찰 장소", filled(ex["개찰장소"])],
     ];
   }
   return (
     <>
       {amounts.length > 0 && <ExtraSection title="금액" rows={amounts} />}
       <ExtraSection title={title} rows={rows} />
+      <ExtraSection title="입찰 일정" rows={schedule} />
     </>
   );
 }
