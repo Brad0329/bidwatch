@@ -118,6 +118,30 @@ async def test_system_source_stats_time_is_correct(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_bid_notice_upsert_updated_at_is_correct(client: AsyncClient):
+    """공공 출처 공고 재수집(upsert 갱신)의 updated_at도 실제 현재 시각 — 2026-09-23에 고친 3곳 중 테스트가 없던 곳."""
+    from app.models.notice import BidNotice, SystemSource
+    from app.services.collection import upsert_bid_notices
+    from sqlalchemy import delete
+
+    bid_no = f"용역-TIME{uuid.uuid4().hex[:8]}-000"
+    notice = Notice(source="나라장터", bid_no=bid_no, title="시각 확인 공고", organization="어느기관",
+                    url="https://g2b.go.kr", extra={"bidNtceNo": bid_no, "bidNtceOrd": "000"})
+    async with get_session_factory()() as db:
+        source_id = await db.scalar(select(SystemSource.id).where(SystemSource.collector_type == "nara"))
+        await upsert_bid_notices([notice], source_id, db)
+        await upsert_bid_notices([notice], source_id, db)  # 두 번째는 갱신 경로
+    try:
+        async with get_session_factory()() as db:
+            updated = await db.scalar(select(BidNotice.updated_at).where(BidNotice.bid_no == bid_no))
+        assert abs((datetime.now(timezone.utc) - updated).total_seconds()) < 120
+    finally:
+        async with get_session_factory()() as db:  # 공유 테이블 — 개발 DB에 남기지 않는다
+            await db.execute(delete(BidNotice).where(BidNotice.bid_no == bid_no))
+            await db.commit()
+
+
+@pytest.mark.asyncio
 async def test_collect_failure_keeps_ready_and_is_reported(client: AsyncClient, fake_scraper):
     scraper_id = await _new_scraper(client)
     fake_scraper["raise"] = RuntimeError("사이트 응답 없음")
