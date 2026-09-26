@@ -43,6 +43,8 @@
   - 기관 출처 4개(v1.4.0) `days` 권장: LH 7 · 가스공사 14(취소는 공고일 그대로 `CANCEL_YN`만 바뀜) · 국방 1~7(수의 2종은 days 무관 전량) ·
     수자원 7~14 — 평일 등록 지연 미측정(연휴 측정)이라 넉넉히 겹쳐 받는다. 국방 목록은 오퍼레이션당 100회/일.
     알리오는 `collect(days=7)`가 max_pages 150에서 절단된다(1,498건, is_partial) — 3일은 안 잘림. 정기 주기를 이에 맞춘다(`institution_sources.md` §5).
+  - 수집 이력을 만들 때 함께: upsert 두 벌(`services/collection.py` bid_notices·scraped_notices)이 new=전부·updated=0으로 센다
+    (2026-09-26 debt-audit) — 이력의 신규/갱신 건수가 이 값을 쓰면 틀린다. `xmax`로 구분 후보.
   - 정기 수집을 붙이면 기준선 대조: GenericScraper는 기준일 이내 0건 페이지에서 멈추고 기업마당은 "마지막 3건 전부 오래됨"에서
     멈춘다 — 공고일 순이 아닌 게시판은 뒤 페이지를 errors 없이 놓친다. 사이트 화면 건수보다 적은 곳은 bid-collectors에 알린다.
 - [ ] Phase 010: 대시보드 (F-012) — **서비스 오픈 직전에 한다**(2026-09-24 사용자 결정: 종전 009였으나 오픈 전까지 불필요)
@@ -50,6 +52,11 @@
   - 신규 공고 수, 키워드 매칭 수, 마감 임박, 출처별 수집 현황 카드
 - [ ] Phase 011: 배포 — 보안 3층 ③ 전체 리뷰(`/security-review`) 통과가 선행 조건 ·
   **F-016 운영자 역할 분리(운영자만 수집 실행)도 선행 조건**
+  - **배포 전 필수 (2026-09-26 debt-audit, 사용자 결정)**: ① 공고 목록 3화면(`notices`·`pre-notices`·`review`) 페이지 버튼이 1~10 고정 —
+    10쪽 넘으면 현재 쪽 표시가 사라진다(`notices/page.tsx:183` 외 2곳) ② 사전규격 목록(`routers/notices.py:291`) 정렬이 `start_date` 하나뿐이라
+    페이지 경계가 흔들리고 취소·이전 차수 제외(F-017)가 없다 — 사전규격에도 적용할 규칙인지 먼저 사용자 확인 ③ 비밀번호 최소 길이가 프론트에만
+    (`register/page.tsx:34`, 백엔드 `schemas/auth.py` 검증 없음) ④ 미리보기(`routers/sources.py:267`)에 설정 URL 사전 확인(`assert_safe_url`) 없음 —
+    ③④는 보안 3층 ③ 전체 리뷰에서 함께. 테스트가 운영 DB에 절대 붙지 않는지도 이때 확인(테스트는 `.env`의 DATABASE_URL을 그대로 쓴다)
   - Docker Compose(운영용) · 도메인 + SSL + Nginx · 베타 테스트
   - CLAUDE.md '배포 체크리스트' 2~4 채우기 · REQUIREMENTS '공개 범위' 확정
 - ※ Phase 번호 미발급·배포 전 할 것 (2026-09-24 사용자 결정, 순서 고정): **F-015 고객사 관리자(사용자설정 마무리)
@@ -131,9 +138,11 @@
     `except ImportError: pass`(`02e4162`) · ② lint 경고 0 — 프론트 `--max-warnings 0`으로 강제, 백엔드 ruff 0 ·
     ③ ruff DTZ003/004로 `utcnow` 금지 + bid_notices upsert 시각 테스트 · ④ SKIP_DETAIL_TYPES↔COLLECTOR_MAP 대조 테스트
     (DB↔COLLECTOR_MAP은 기존 `test_every_system_source_has_a_constructible_collector`)
-  - 미착수(사용자가 고를 것): 테스트 전용 DB(일반 — 아래 항목) · 사전규격 목록 정렬·취소 제외 누락(`notices.py:291`) · 비밀번호 길이 백엔드 검증 ·
-    미리보기 URL 사전 확인 · `clean_title` 공공 출처 미적용(일반) · 취소 판정 두 벌(일반) · upsert 두 벌의 new/updated 건수 오류 ·
-    페이지 버튼 1~10 고정(10쪽 넘으면 현재 쪽 표시 사라짐) · 프론트 백↔프론트 규칙 중복(태그 5종 4벌·색 불일치 등)
+  - **곁가지는 여기서 멈춤(2026-09-26 사용자 결정)** — 남은 것의 행선지:
+    배포 전 필수 4건 → Phase 011 항목(페이지 버튼·사전규격 목록·비밀번호 길이·미리보기 URL) ·
+    upsert 건수 오류 → Phase 009 항목 · 테스트 전용 DB → 아래 보류 항목(운영 DB 비접속 확인은 Phase 011) ·
+    **안 함(지금 틀린 결과를 내지 않음, 한쪽만 고칠 위험뿐)**: `clean_title` 공공 출처 미적용 · 취소 판정 두 벌 · 백↔프론트 규칙 중복
+    (태그 5종 4벌·색 불일치, 역할·출처 식별·D-day 등) · 복사 블록(구독 조회 4벌·엔진 생성·훅 main 5벌) — 해당 코드를 고칠 때 함께 본다
 
 - **테스트가 개발 DB를 공유** — `backend/tests/conftest.py`가 앱의 DATABASE_URL을 그대로 쓴다. 테스트가 회원가입 등으로
   개발 DB에 행을 쌓는다. **2026-09-24 실해**: 기본 제공 목록 테스트가 가짜 기본 제공 행을 4개 남겨 실제 관리자설정 목록에
