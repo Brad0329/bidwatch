@@ -95,6 +95,29 @@ REDUNDANT_CD_SEGMENT = re.compile(_REPO_CD + _REDIRECTS + r"\s*$")
 # "too many arguments"로 죽어 ls는 돌지도 않는다. vanasso.kr 2026-09-06: 99건 통과).
 REDUNDANT_CD_COMMAND = re.compile(_REPO_CD + _REDIRECTS + r"(?:\s*(?:&&|;)|\s+\S)")
 
+
+# 저장소 루트의 **절대경로를 인자·실행 파일로 쓴** 형태. 허용 규칙은 상대경로라 이것도 형태 문제다.
+# 예전엔 "python — 분류 밖"으로 셌다 — bidwatch 2026-09-26 실측 최대 원인(64건·약 2.1시간)을 못 짚었다.
+# `.claude/hooks/no_abs_project_path.py`에 같은 판정이 있다 — `tests/test_no_abs_project_path.py`가 대조한다.
+def root_pattern(root: Path) -> re.Pattern[str]:
+    comps = [c for c in re.split(r"[\\/]+", str(root)) if c]
+    first = comps[0]
+    if re.fullmatch(r"[A-Za-z]:", first):
+        head = rf"(?:{first[0]}:|/{first[0]})"
+    else:
+        head = re.escape(first)
+    body = r"[\\/]+".join(re.escape(c) for c in comps[1:])
+    return re.compile(rf"""(?<![\w/\\-]){head}[\\/]+{body}(?=[\\/"'\s;&|)]|$)""", re.IGNORECASE)
+
+
+ABS_ROOT = root_pattern(ROOT)
+
+
+def relativize(segment: str, pattern: re.Pattern[str] = ABS_ROOT) -> str:
+    """절대경로를 상대경로로 고쳐 부른 모습 — 시나리오 B용. `<루트>/x` → `x`, 맨 `<루트>` → `.`"""
+    segment = re.sub(pattern.pattern + r"[\\/]+", "", segment, flags=re.IGNORECASE)
+    return pattern.sub(".", segment)
+
 # ── 원인 ② 읽기 전용 ────────────────────────────────────────────────────────
 # 상태를 바꾸지 않는 명령만. **여기 없는 것은 자동 제안하지 않는다**(모르면 안 여는 쪽).
 SAFE_READONLY = {
@@ -323,7 +346,7 @@ def is_readonly(segment: str) -> bool:
 
 
 def classify(segment: str) -> str:
-    if segment.startswith("cd "):
+    if segment.startswith("cd ") or ABS_ROOT.search(segment):
         return "형태"
     if head_command(segment) in SHELL_KEYWORDS:
         return "셸제어문"
@@ -339,6 +362,7 @@ def analyze(calls: list[tuple[str, str]], rules: dict[str, list[str]]):
         "total": len(calls),
         "prompted": 0,
         "cd_calls": 0,
+        "abs_calls": 0,
         "causes": collections.Counter(),
         "readonly_missing": collections.Counter(),
         "readonly_as_first": collections.Counter(),  # 파이프가 아니라 파일 조회로 쓴 것
@@ -348,6 +372,8 @@ def analyze(calls: list[tuple[str, str]], rules: dict[str, list[str]]):
         segs = split_segments(command)
         if REDUNDANT_CD_COMMAND.match(command):
             stats["cd_calls"] += 1
+        if ABS_ROOT.search(command):
+            stats["abs_calls"] += 1
         # cd를 걷어낸 뒤의 첫 조각 — 그것이 '파일 조회로 쓴 필터'인지 판정하는 기준이다
         meaningful = [s for s in segs if not s.startswith("cd ")]
         missing = [s for s in segs if not allowed(s, rules[tool])]
@@ -374,7 +400,7 @@ def simulate(calls, rules, drop_cd: bool, extra: list[str]) -> int:
     for tool, command in calls:
         segs = split_segments(command)
         if drop_cd:
-            segs = [s for s in segs if not REDUNDANT_CD_SEGMENT.match(s)]
+            segs = [relativize(s) for s in segs if not REDUNDANT_CD_SEGMENT.match(s)]
         if any(not allowed(s, rules[tool], extra if tool == "Bash" else []) for s in segs):
             n += 1
     return n
@@ -427,13 +453,14 @@ def main() -> int:
     for key in ("형태", "셸제어문", "읽기전용", "상태변경", "판단필요"):
         if st["causes"][key]:
             print(f"  {st['causes'][key]:>4}회  {labels[key]}")
-    print(f"  (그중 `cd <저장소 루트> &&` 형태의 호출: {st['cd_calls']}건)")
+    print(f"  (그중 `cd <저장소 루트> &&` 형태의 호출: {st['cd_calls']}건 / "
+          f"저장소 절대경로를 쓴 호출: {st['abs_calls']}건)")
 
     candidates = [f"{name} *" for name, _ in st["readonly_missing"].most_common()]
 
     print("\n[시나리오] 처방별로 몇 건이 남는가")
     print(f"  A. 지금 그대로                     {simulate(calls, rules, False, []):>4}건")
-    print(f"  B. cd 접두사만 없앴을 때           {simulate(calls, rules, True, []):>4}건")
+    print(f"  B. 호출 형태만 고쳤을 때(cd·절대경로) {simulate(calls, rules, True, []):>4}건")
     if candidates:
         print(f"  C. B + 읽기 전용 전부 허용 가정    {simulate(calls, rules, True, candidates):>4}건"
               "   (상한 추정용 — 아래 참조)")

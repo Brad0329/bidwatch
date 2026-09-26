@@ -60,6 +60,12 @@
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_env_prefix.py\"",
             "timeout": 10,
             "statusMessage": "환경변수 접두사 검사"
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_abs_project_path.py\"",
+            "timeout": 10,
+            "statusMessage": "저장소 절대경로 검사"
           }
         ]
       }
