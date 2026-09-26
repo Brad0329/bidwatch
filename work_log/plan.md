@@ -134,9 +134,6 @@
     미리보기 URL 사전 확인 · `clean_title` 공공 출처 미적용(일반) · 취소 판정 두 벌(일반) · upsert 두 벌의 new/updated 건수 오류 ·
     페이지 버튼 1~10 고정(10쪽 넘으면 현재 쪽 표시 사라짐) · 프론트 백↔프론트 규칙 중복(태그 5종 4벌·색 불일치 등)
 
-- **템플릿 규칙 위반 — 이식 시점(2026-09-23) 발견, 코드 미수정**. 착수 시 한 커밋씩:
-  - `backend/app/tasks/collect_api.py:149` `except ImportError: pass` — 조용한 실패(celery 미설치 시 태스크 등록을
-    건너뛰는 의도이나 로그·주석 없음). 로그 한 줄 + 이유 주석.
 - **테스트가 개발 DB를 공유** — `backend/tests/conftest.py`가 앱의 DATABASE_URL을 그대로 쓴다. 테스트가 회원가입 등으로
   개발 DB에 행을 쌓는다. **2026-09-24 실해**: 기본 제공 목록 테스트가 가짜 기본 제공 행을 4개 남겨 실제 관리자설정 목록에
   섞일 뻔했다(테스트에 정리 추가, 행 삭제). scraper_registry에 `file:///etc/passwd`·`http://127.0.0.1/admin` 등 URL 가드

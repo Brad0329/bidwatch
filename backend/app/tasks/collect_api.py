@@ -160,5 +160,7 @@ try:
     collect_single_source_task = _celery.task(
         name="app.tasks.collect_api.collect_single_source_task"
     )(collect_single_source_task)
-except ImportError:
-    pass
+except ImportError as e:
+    # 의도된 분기: Celery·Redis 미설치(현재 관리자 수동·동기 수집만 쓴다, plan.md 아키텍처) — 함수는 그대로 동기 호출된다.
+    # 조용히 넘기지 않고 남긴다 — 정기 수집(Phase 009)을 Celery로 정했는데 이 줄이 찍히면 설치 누락이다.
+    logger.info("Celery 미설치 — 수집 태스크를 Celery에 등록하지 않음 (%s)", e)
