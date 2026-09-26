@@ -212,7 +212,8 @@ export default function NoticeModal({ notice: initialNotice, onClose, onTagChang
         <div className="px-6 py-5 space-y-5">
           {/* 기본 정보 */}
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-            <InfoRow label="발주기관" value={notice.organization} />
+            {/* 빈 값(단일 기관 출처·URL 출처, bid-collectors v1.6.0)은 출처 이름으로 — 2026-09-27 사용자 결정 */}
+            <InfoRow label="발주기관" value={notice.organization || notice.source_name} />
             <InfoRow label="공고번호" value={notice.bid_no} />
             <InfoRow label="공고등록일" value={notice.start_date || "—"} />
             <InfoRow label="마감일" value={notice.end_date || "—"} />

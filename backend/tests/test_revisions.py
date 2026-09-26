@@ -210,10 +210,15 @@ async def test_construction_region_uses_site(store):
     await save("nara", [
         _nara(t, "A", "000", bid_type="공사", region="경희대학교 국제캠퍼스", cnstrtsiteRgnNm="경기도 용인시 기흥구"),
         _nara(t, "B", "000", bid_type="용역", region="경상북도 남부건설사업소"),  # 현장 지역 없음 → 기존대로
+        # v1.6.0 모양: 용역·물품 region "" → 수요기관명(extra.dminsttNm)에서 지역 (2026-09-27 사용자 결정)
+        _nara(t, "C", "000", bid_type="물품", dminsttNm="부산광역시 해운대구"),
+        _nara(t, "D", "000", bid_type="공사", region="충청남도 천안시", cnstrtsiteRgnNm="충청남도 천안시", dminsttNm="서울특별시"),
     ])
     r = await rows(t)
     assert r[f"공사-T{t}A-000"].region == "경기"
     assert r[f"용역-T{t}B-000"].region == "경북"
+    assert r[f"물품-T{t}C-000"].region == "부산"
+    assert r[f"공사-T{t}D-000"].region == "충남"  # 현장 지역이 수요기관명보다 먼저
 
 
 @pytest.mark.asyncio

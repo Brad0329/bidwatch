@@ -88,15 +88,22 @@ export default function NoticeTable({ notices, onFilterByKeyword, onFilterByOrg,
               </button>
             </div>
 
-            {/* 발주기관 — 클릭 시 해당 기관으로 검색 */}
+            {/* 발주기관 — 클릭 시 해당 기관으로 검색. 빈 값(단일 기관 출처·URL 출처, bid-collectors v1.6.0)은
+                출처 이름을 보이되 검색 버튼으로 두지 않는다 — 출처 이름은 기관명 검색에 걸리지 않는다 */}
             <div className="min-w-0 overflow-hidden">
-              <button
-                onClick={() => onFilterByOrg?.(notice.organization)}
-                title={notice.organization}
-                className="text-xs text-gray-600 hover:text-blue-600 hover:underline truncate block text-left w-full"
-              >
-                {notice.organization}
-              </button>
+              {notice.organization ? (
+                <button
+                  onClick={() => onFilterByOrg?.(notice.organization)}
+                  title={notice.organization}
+                  className="text-xs text-gray-600 hover:text-blue-600 hover:underline truncate block text-left w-full"
+                >
+                  {notice.organization}
+                </button>
+              ) : (
+                <span title={notice.source_name} className="text-xs text-gray-600 truncate block">
+                  {notice.source_name || "—"}
+                </span>
+              )}
             </div>
 
             {/* 등록일 */}

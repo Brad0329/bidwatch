@@ -1,6 +1,6 @@
 # 출처 필드 사전 — bid-collectors가 넘기는 값의 의미
 
-> 작성 2026-09-25 · bid-collectors **v1.2.5** 기준(이후 절마다 버전 표시 — 9절 C-2 v1.3.0, 11절 v1.4.0, 11-2 v1.5.0). 출처별로 실제 호출(소량)과 공식 명세를 대조해 만들었다.
+> 작성 2026-09-25 · bid-collectors **v1.2.5** 기준(이후 절마다 버전 표시 — 9절 C-2 v1.3.0, 11절 v1.4.0, 11-2 v1.5.0, 표준 필드 원천 §1·부록 A v1.6.0). 출처별로 실제 호출(소량)과 공식 명세를 대조해 만들었다.
 > - **키가 무엇이 오는가**의 정답은 실측과 코드(`bid_collectors/*.py`)다. **키가 무슨 뜻인가**의 근거는 명세다.
 >   명세·화면으로 확인하지 못한 뜻은 반드시 **추정**으로 표시한다.
 > - bid-collectors handover가 표준 필드의 원천이나 `extra`를 바꾸면 이 문서의 해당 절을 같은 작업에서 고친다.
@@ -22,28 +22,31 @@
 ## 1. 표준 필드 — 출처마다 뜻이 다르다
 
 `interface.md`의 정의는 "공고일/마감일/예산·추정가격/지역" 같은 한 단어 주석뿐이다. 실제 원천은 아래와 같다.
+**v1.6.0(2026-09-26) 원칙 ②** — 출처가 준 값을 타입만 통일해 담는다(추정·대체·합성·절단·상수 없음). 원천이 없으면 `""`/None이다.
 
-| 출처 | start_date | end_date | status 판정 | budget | organization | region(원문 → BidWatch가 `normalize_region`) | category |
+| 출처 | start_date | end_date | status 판정 | budget | organization | region(원문 → BidWatch가 `notice_region`) | category |
 |---|---|---|---|---|---|---|---|
-| 나라장터 입찰 용역·물품 | `bidNtceDt` 공고일시 | `bidClseDt` 입찰마감 | 마감일 | `asignBdgtAmt` **배정예산** | `ntceInsttNm` **공고기관** | `dminsttNm` **수요기관명**(지역 필드 아님) | 공공조달 대>중 분류 / 물품은 세부품명 |
-| 나라장터 입찰 공사 | 같음 | 같음 | 마감일 | `presmptPrce` **추정가격(부가세 제외)** — 공사엔 배정예산 태그가 없다. 예산 `bdgtAmt`는 안 씀 | 같음 | bid-collectors는 같음 — **BidWatch는 공사현장 `cnstrtsiteRgnNm`으로 덮는다**(2026-09-25, `notice_region`) | 주공종명 |
-| 나라장터 사전규격 (`nara_prespec`) | `rcptDt` 접수일시 | `opninRgstClseDt` 의견등록마감 | 마감일 | `asignBdgtAmt` 배정예산 | `orderInsttNm` 발주기관 | 없음 | `prdctClsfcNoNm` (**title과 같은 값**) |
-| 나라장터 낙찰 (BidWatch 미사용) | `fnlSucsfDate` 최종낙찰일 | 없음 | 항상 closed | `sucsfbidAmt` **낙찰금액** | `dminsttNm` 수요기관 | 없음 | 없음 |
-| 나라장터 계약 (BidWatch 미사용) | `cntrctCnclsDate` 체결일 | `cntrctPrd` 계약기간 — **틀리는 경우 많음**(부록 A-2) | 마감일 | `thtmCntrctAmt` 금차계약금액 | `cntrctInsttNm` 계약기관 | `cntrctInsttJrsdctnDivNm` **기관 분류**(국가기관 등) | 없음 |
-| K-Startup | `pbanc_rcpt_bgng_dt` **접수 시작** | `pbanc_rcpt_end_dt` 접수 마감 | **출처 플래그** `rcrt_prgs_yn=="Y"` | 없음 | `pbanc_ntrp_nm` → `sprv_inst`(**기관 유형**) → "창업진흥원" | `supt_regin` (`전국`·`전남광주` 같은 약칭) | `supt_biz_clsfc` 지원 분야 |
-| 기업마당 | `reqstBeginEndDe` 신청기간 앞쪽 | 신청기간 뒤쪽. **18%는 "예산 소진시까지" 같은 문장이라 None** | 마감일(없으면 ongoing) | 없음 | `excInsttNm` 수행기관(`기초자치단체`·`직접수행` 같은 유형값 섞임) | `jrsdInsttNm` **소관기관**(부처명이 들어옴) | 지원분야 대분류 |
-| 중소벤처기업부 | `applicationStartDate` 신청 시작 | `applicationEndDate` 신청 마감 | 마감일(없으면 ongoing) | 항상 None(원천 태그가 실제 응답에 없음) | 상수 "중소벤처기업부" | 없음 | `writerPosition` **담당부서명** |
-| 보조금24 | 항상 None | `신청기한` — 대부분 자유 문장이라 **4%만 추출, 그것도 기간의 시작일**(부록 A-2) | 마감일(없으면 ongoing) | 없음 | `소관기관명` | 없음 | `서비스분야` |
+| 나라장터 입찰 용역·물품 | `bidNtceDt` 공고일시 | `bidClseDt` 입찰마감 | 마감일 · `ntceKindNm`="취소공고" → cancelled | `asignBdgtAmt` **배정예산** | `ntceInsttNm` **공고기관** | 패키지 `""`(지역 필드 없음) — **BidWatch가 extra `dminsttNm` 수요기관명에서 뽑는다**(2026-09-27 사용자 결정, 종전 결과 유지) | 용역 `pubPrcrmntLrgClsfcNm` 대분류(중분류는 extra) / 물품 세부품명 |
+| 나라장터 입찰 공사 | 같음 | 같음 | 같음 | `bdgtAmt` **배정예산(예산금액)** — 추정가격 `presmptPrce`는 extra | 같음 | `cnstrtsiteRgnNm` **공사현장 지역**(없으면 BidWatch가 수요기관명) | 주공종명 |
+| 나라장터 사전규격 (`nara_prespec`) | `rcptDt` 접수일시 | `opninRgstClseDt` 의견등록마감 | 마감일 | `asignBdgtAmt` 배정예산 | `orderInsttNm` 발주기관 | 없음 | `bsnsDivNm` **업무 구분**(용역·물품·공사) |
+| 나라장터 낙찰 (BidWatch 미사용) | `fnlSucsfDate` 최종낙찰일만 | 없음 | 항상 closed | None(낙찰금액은 extra) | `dminsttNm` 수요기관 | 없음 | 없음 |
+| 나라장터 계약 (BidWatch 미사용) | `cntrctCnclsDate` 체결일 | 없음 | 늘 ongoing | `thtmCntrctAmt` 금차계약금액만 | `cntrctInsttNm` 계약기관 | `""` | 없음 |
+| K-Startup | `pbanc_rcpt_bgng_dt` **접수 시작** | `pbanc_rcpt_end_dt` 접수 마감 | **출처 플래그** `rcrt_prgs_yn=="Y"`(없으면 마감일) | 없음 | `pbanc_ntrp_nm`만(없으면 `""`) | `supt_regin` (`전국`·`전남광주` 같은 약칭) | `supt_biz_clsfc` 지원 분야 |
+| 기업마당 | `reqstBeginEndDe`가 기간("A ~ B")일 때 앞쪽 — 날짜 하나면 None | 기간 뒤쪽. **"예산 소진시까지" 같은 문장이면 None** | 마감일(없으면 ongoing) | 없음 | `excInsttNm` 수행기관(`기초자치단체`·`직접수행` 같은 유형값 섞임) | `""`(종전 소관기관 부처명) | 지원분야 대분류 |
+| 중소벤처기업부 | `applicationStartDate` 신청 시작 | `applicationEndDate` 신청 마감 | 마감일(없으면 ongoing) | 항상 None(원천 태그가 실제 응답에 없음) | `""`(종전 상수 "중소벤처기업부") | 없음 | `""`(종전 담당부서명) |
+| 보조금24 | 항상 None | `신청기한` — 대부분 자유 문장이라 None, 기간이면 **끝 날짜**(v1.6.0) | 마감일(없으면 ongoing) | 없음 | `소관기관명` | 없음 | `서비스분야` |
 | 알리오 | `bdate` — 화면 라벨 **"등록일"**(공고일이 아님) | `bidInfoEndDt` 입찰종료일 | 마감일(없으면 ongoing) | 없음 | `pname` 기관명 | 없음 | 없음 |
-| URL 출처 (GenericScraper) | AI 설정이 고른 목록의 날짜 칸 — 사이트마다 등록일·접수기간 등 **다름** | 항상 None | **게시일로 판정**(어제 이전 게시 = closed) — BidWatch는 배지를 숨긴다 | 없음 | 상수 `config.name` | 없음 | 없음 |
+| URL 출처 (GenericScraper) | AI 설정이 고른 목록의 날짜 칸 — 사이트마다 등록일·접수기간 등 **다름** | 항상 None | **게시일로 판정**(어제 이전 게시 = closed) — BidWatch는 배지를 숨긴다 | 없음 | `""`(종전 `config.name` — 사이트 이름은 source) | 없음 | 없음 |
 
 **공통 규칙 (코드 확인)**
-- `parse_date`는 기간 문자열("A~B")이면 **시작일**을 돌려준다(`utils/dates.py`). end_date 원천이 기간 문자열인 출처에서 end_date가 틀린다.
-- status는 **수집 시점의 날짜로 계산해 저장**한 값이다. 이후에는 다시 계산하지 않는다. bid-collectors에는 `"cancelled"`를 만드는 코드가 없어서 나라장터 취소공고(`ntceKindNm=취소공고`)도 ongoing/closed로 온다
-  — **BidWatch가 저장 시점에 원문으로 `cancelled`를 넣고 같은 공고번호의 낮은 차수에도 퍼뜨린다**(2026-09-25, F-017 `refresh_revisions`).
+- `parse_date`는 기간 문자열("A~B")에서 end_date 원천이면 끝 날짜를 쓴다(v1.6.0, 부록 A-2 해소). "2026. 2. 1." 같은 점+공백 형식도 읽는다.
+- status는 **수집 시점의 날짜로 계산해 저장**한 값이다. 이후에는 다시 계산하지 않는다. v1.6.0부터 bid-collectors도 취소 원문(나라장터 `ntceKindNm`·LH `bidKind`·가스 `CANCEL_YN`·
+  국방 `pblancSe`/`progrsSttus`)으로 `cancelled`를 준다 — **BidWatch도 같은 키·값으로 판정하고 낮은 차수에 퍼뜨린다**(F-017 `refresh_revisions`, 결과 같음).
 - end_date가 없으면 status는 항상 ongoing이다(나라장터 입찰 용역 12%·물품 9%·공사 1%, 기업마당 18%, 보조금24 96%, 알리오 2%).
-- content: K-Startup·중소벤처는 **앞 500자에서 자른다**. 나라장터·알리오·URL 출처는 항상 빈 문자열이다.
-- budget은 출처마다 배정예산·추정가격·낙찰금액·계약금액으로 **서로 다른 개념**이다. 출처를 가로질러 금액을 비교하면 안 된다.
+- content: K-Startup·중소벤처는 **전문**(v1.6.0 — 종전 500자 절단), 보조금24는 서비스목적요약만(지원내용은 extra). 나라장터·알리오·URL 출처는 항상 빈 문자열이다.
+- budget은 출처마다 배정예산·예산금액으로 **서로 다른 개념**이다. 출처를 가로질러 금액을 비교하면 안 된다.
+- **organization `""`** 인 출처(LH·가스·수자원·중소벤처·d2b 국외·URL 출처)는 화면이 출처 이름을 대신 보인다(`NoticeModal`·`NoticeTable`, 2026-09-27 사용자 결정) —
+  기관명 검색(`q`)에는 걸리지 않는다.
 
 ---
 
@@ -94,7 +97,7 @@
 | 키 | 항목명 | 의미 | 예시 | 출현 |
 |---|---|---|---|---|
 | ntceInsttCd / ntceInsttNm | 공고기관코드/명 | 공고를 **내는** 기관 → organization | `경상북도` | 전부 |
-| dminsttCd / dminsttNm | 수요기관코드/명 | 계약을 의뢰한 **실제 수요기관** → region 원천. 공고기관과 같은 비율 89/96/98% | `경상북도 남부건설사업소` | 전부 |
+| dminsttCd / dminsttNm | 수요기관코드/명 | 계약을 의뢰한 **실제 수요기관** → BidWatch가 용역·물품 region을 여기서 뽑는다(v1.6.0부터 패키지 region은 `""`). 공고기관과 같은 비율 89/96/98% | `경상북도 남부건설사업소` | 전부 |
 | ntceInsttOfclNm | 공고기관담당자명 | | | 전부 |
 | ntceInsttOfclTelNo | 공고기관담당자전화번호 | | `054-880-2930` | 1290/1065/926 |
 | ntceInsttOfclEmailAdrs | 공고기관담당자이메일 | **용역은 항상 비어 있음** | | **0**/1108/942 |
@@ -121,7 +124,7 @@
 | 키 | 항목명 | 의미 | 출현 |
 |---|---|---|---|
 | asignBdgtAmt | 배정예산금액 (용역·물품) | 배정된 예산 또는 설계금액 → budget | 1307/1108/**태그 없음** |
-| bdgtAmt | 예산금액 (공사) | 공사의 예산. **budget에 쓰이지 않는다** | 공사 942 |
+| bdgtAmt | 예산금액 (공사) | 공사의 예산 → budget(v1.6.0, 종전 추정가격 `presmptPrce`) | 공사 942 |
 | presmptPrce | 추정가격 | 예정가격 결정 전 금액으로, **부가세·조달수수료를 뺀 값**. 국제입찰 대상 판단 기준 | 1307/1108/942 |
 | VAT | 부가가치세 | 추정가격+VAT = 예산인 비율: 용역 91%·물품 95%·공사 56% | 1307/1108/942 |
 | indutyVAT | 주공종부가가치세 | | 공사 92 |
@@ -168,7 +171,7 @@
 | rgnDutyJntcontrctYn / rgnDutyJntcontrctRt | 지역의무공동도급 여부 / 비율(%) | | 공사 942 / 20 |
 | jntcontrctDutyRgnNm1~3 | 공동도급의무지역명 | | 공사 드묾 |
 | incntvRgnNm1~4 | 가산지역명 (공사) | 적격심사 가산점 지역 | 공사 13 |
-| cnstrtsiteRgnNm | 공사현장지역명 (공사) | **실제 공사 지역**(`경상북도 포항시 남구`). BidWatch가 region으로 쓴다(2026-09-25) | 공사 942 |
+| cnstrtsiteRgnNm | 공사현장지역명 (공사) | **실제 공사 지역**(`경상북도 포항시 남구`) → 공사 region(v1.6.0 패키지, BidWatch는 2026-09-25부터) | 공사 942 |
 
 **분류·품목·공종**
 | 키 | 항목명 | 의미 | 출현 | 근거 |
@@ -204,7 +207,7 @@
 - BidWatch 사용처: `tasks/collect_api.py`(나라장터 수집 뒤 연쇄 수집) → `/api/notices/pre-specs` → 화면 `/pre-notices`
 
 ### B. 표준 필드 ← 원문
-bid_no `사전규격-{업무}-{bfSpecRgstNo|refNo}` · title=category=`prdctClsfcNoNm` · url은 `https://www.g2b.go.kr` 고정, detail_url `""`(응답에 상세 링크 필드가 없다) ·
+bid_no `사전규격-{업무}-{bfSpecRgstNo|refNo}` · title `prdctClsfcNoNm`(값은 사업명, 없으면 건너뜀 — v1.6.0) · category `bsnsDivNm` · url은 `https://www.g2b.go.kr` 고정, detail_url `""`(응답에 상세 링크 필드가 없다) ·
 attachments = `specDocFileUrl1~5`(이름 필드가 없어서 `규격서{i}`로 붙인다) · 나머지는 §1 참고.
 
 ### C. extra 키 사전 — 근거 전부 `명세`, N=222 (용역 100·물품 100·공사 22)
@@ -254,7 +257,7 @@ attachments = `specDocFileUrl1~5`(이름 필드가 없어서 `규격서{i}`로 �
 
 ### B. 표준 필드 ← 원문
 bid_no `KSTARTUP-{pbanc_sn}` · title `biz_pbanc_nm`(엔티티를 풀고, 태그는 남음) · url `detl_pg_url` → `biz_aply_url` → `biz_gdnc_url` · detail_url `detl_pg_url` ·
-content = `pbanc_ctnt`를 텍스트화한 뒤 **500자에서 자름** · 나머지는 §1 참고.
+content = `pbanc_ctnt`를 텍스트화(v1.6.0부터 자르지 않음) · 나머지는 §1 참고.
 
 ### C. extra 키 사전 — N=124
 | 키 | 항목명 | 의미 | 형식·예시 | 출현 | 근거 |
@@ -313,7 +316,7 @@ attachments = (`printFileNm`,`printFlpthNm`) + (`fileNm`,`flpthNm`) · 수집 �
 | pblancId | 공고ID | | `PBLN_000000000126771` | 100 | 명세 |
 | pblancNm | 공고명 | | | 100 | 명세 |
 | pblancUrl | 공고URL | 기업마당 상세 | | 100 | 명세 |
-| jrsdInsttNm | 소관기관명 | 소관 부처·광역지자체(`중소벤처기업부`, `경상북도`) → region 원천 | | 100 | 명세 |
+| jrsdInsttNm | 소관기관명 | 소관 부처·광역지자체(`중소벤처기업부`, `경상북도`) — v1.6.0 전까지 region 원천(지금 region `""`) | | 100 | 명세 |
 | excInsttNm | 수행기관명 | 실제 수행 기관(`기초자치단체`·`직접수행` 같은 유형값 섞임) → organization | | 100 | 명세 |
 | bsnsSumryCn | 사업개요내용 | 본문. **HTML 100/100** | 201~904자 | 100 | 명세 |
 | pldirSportRealmLclasCodeNm | 지원분야 대분류 | 경영·기술·수출·내수·인력·금융·창업 → category | | 100 | 명세 |
@@ -345,7 +348,7 @@ attachments = (`printFileNm`,`printFlpthNm`) + (`fileNm`,`flpthNm`) · 수집 �
 - 명세: data.go.kr 페이지 내장 swagger. 키 11개가 명세와 실측에서 완전히 일치한다.
 
 ### B. 표준 필드 ← 원문
-bid_no `MSS-{itemId}` · title `title`(HTML 제거) · url=detail_url `viewUrl` · content = `dataContents`를 텍스트화한 뒤 **500자에서 자름** ·
+bid_no `MSS-{itemId}` · title `title`(HTML 제거) · url=detail_url `viewUrl` · content = `dataContents`를 텍스트화(v1.6.0부터 자르지 않음) ·
 attachments = `fileName[i]`+`fileUrl[i]` 짝 · budget은 원천 태그(`suptScale`)가 실제로 없어서 항상 None. 나머지는 §1 참고.
 
 ### C. extra 키 사전 — 근거 전부 `명세`. N=17(수집기) / 88(원문)
@@ -373,7 +376,7 @@ attachments = `fileName[i]`+`fileUrl[i]` 짝 · budget은 원천 태그(`suptSca
   그래서 아래 의미는 대부분 **추정**이다. 코드값 공식 목록도 찾지 못했다(관측값만 적음).
 
 ### B. 표준 필드 ← 원문
-bid_no `GOV24-{서비스ID}` · title `서비스명` · url `상세조회URL`(없으면 gov.kr 주소를 조립) · content = `서비스목적요약` + 줄바꿈 + `지원내용`(자르지 않음) · 나머지는 §1 참고.
+bid_no `GOV24-{서비스ID}` · title `서비스명` · url `상세조회URL`(없으면 gov.kr 주소를 조립) · content = `서비스목적요약`만(v1.6.0 — `지원내용`은 extra) · 나머지는 §1 참고.
 
 ### C. extra 키 사전 — 키가 한글이다. A=수집기 100건 / B=원문 첫 페이지 100건
 | 키 | 의미 | 형식·예시 | 출현 A/B | 근거 |
@@ -441,7 +444,7 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 ## 10. URL 출처 (`GenericScraper`)
 
 - **extra는 없다(항상 None).** v1.2.5의 "원문 전부" 원칙 적용 범위 밖이다.
-- source = organization = `config.name`(AI가 만든 사이트 표시명) · title = `title_selector` 텍스트 · start_date = `date_selector` 칸(기간이면 시작일) ·
+- source = `config.name`(AI가 만든 사이트 표시명), organization = `""`(v1.6.0 — 종전 `config.name`) · title = `title_selector` 텍스트 · start_date = `date_selector` 칸(기간이면 시작일) ·
   end_date 없음 · status는 **게시일로 판정** · url·detail_url = 제목 링크 · bid_no = `SCR-{source_key}-{md5(title+url)[:10]}`(제목이 바뀌면 다른 공고가 된다).
 - start_date가 무슨 날짜인지(등록일·공고일·접수기간)는 사이트와 AI 설정에 따라 다르다. 코드는 이를 모른다.
 
@@ -450,8 +453,11 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 ## 11. 자체조달 기관 — LH·가스공사·국방전자조달·수자원공사 (bid-collectors v1.4.0, 2026-09-26)
 
 - **원천·함정·키 뜻의 원본은 bid-collectors `docs/institution_sources.md`** — 여기는 BidWatch가 쓰는 키만 적는다(이중 관리 안 함).
-- 공통: `budget`·`region`은 **비어 온다**(7일 실측 575건 전부) — 금액은 extra 원래 이름으로 상세 "금액" 칸에(`NoticeModal.tsx` `InstitutionExtra`),
-  지역은 "지역 미상". 출처는 bid_no 접두사(`LH-`·`KOGAS-`·`D2B-`·`KWATER-`)로 가린다.
+- 공통: `region`은 **비어 온다**(7일 실측 575건 전부) — 지역은 "지역 미상". `budget`도 비지만 **국방 수의 2종만 v1.6.0부터 `budgetAmount` 예산금액**.
+  금액은 extra 원래 이름으로 상세 "금액" 칸에(`NoticeModal.tsx` `InstitutionExtra`). 출처는 bid_no 접두사(`LH-`·`KOGAS-`·`D2B-`·`KWATER-`)로 가린다.
+- v1.6.0: organization `""`(LH·가스·수자원 전부, 국방 국외경쟁) · 국방 url = **사이트 상세 화면**(지명경쟁은 로그인 필요라 목록 화면, 비공식 경로 — `interface.md` §5) ·
+  국방 수의 2종 조회 범위 (오늘-days)~1년 뒤(수집 기간 안에 마감된 closed가 들어온다 — 2026-09-27 days=30 재수집 후 2,524건 중 closed 1,700, 목록에 그대로 보인다: 사용자 결정).
+  LH는 2026-09-27부터 API가 업무 구분을 `"null"`로 줘 url이 첫 화면 + 수집 errors 1줄(`is_partial`).
 - 취소·차수(F-017, `services/collection.py`): LH `bidKind`(일반/정정/취소공고, 같은 행이 덮임 — `bidDegree` 00→01) · 가스 `CANCEL_YN=취소`(3/54) ·
   국방 `pblancSe`(정상/긴급/재/정정/취소공고, 경쟁 3종 130건) · 국방 수의 2종(288건, `pblancSe` 없음)은 `progrsSttus`(진행중/**공개협상취소** 34) —
   **handover에 없던 키, bidwatch 실측**. 국방 `pblancCanclAt`은 4건 모두 N이라 쓰지 않는다.
@@ -481,17 +487,17 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 | # | 내용 | 영향 | BidWatch 영향 |
 |---|---|---|---|
 | 1 | ~~계약 공사: 응답의 제목이 `cnstwkNm`인데 수집기가 `cntrctNm`을 필수로 요구 → 공사 100/100건이 건너뛰어짐~~ **v1.3.1에서 해소**(제목 `cntrctNm` → 없으면 `cnstwkNm`) | 계약 공사 수집 0건 | 없음(미사용) |
-| 2 | `parse_date`가 기간 문자열에서 **시작일**을 돌려줘서 end_date가 틀림 — 계약 `cntrctPrd`, 보조금24 `신청기한`(보조금24는 bid-collectors plan.md에 이미 보류 등록) | 접수 중인 건이 closed로 판정됨 | 보조금24(현재 화면에서 숨김) |
+| 2 | ~~`parse_date`가 기간 문자열에서 **시작일**을 돌려줘서 end_date가 틀림 — 계약 `cntrctPrd`, 보조금24 `신청기한`~~ **v1.6.0에서 해소**(보조금24 기간이면 끝 날짜, 계약은 end_date 없음) | 접수 중인 건이 closed로 판정됨 | 보조금24 |
 | 3 | ~~나라장터 입찰 첨부 루프가 `bidNtceFlNm{i}`/`bidNtceFlUrl{i}`를 읽는데, 명세에도 실측에도 없는 태그다~~ **v1.3.1에서 해소**(루프 삭제, 규격서 첨부는 그대로) | 죽은 코드 | 없음 |
 | 4 | ~~중소벤처 budget 원천 `suptScale`이 명세·실측 모두에 없다~~ **v1.3.1에서 해소**(손 매핑 삭제 — budget은 계속 None) | budget 항상 None | 없음 |
-| 5 | 나라장터 공사 budget = 추정가격(부가세 제외). 예산 `bdgtAmt`를 쓰지 않는다 | 용역·물품과 금액 의미가 다름 | 공고 목록 예산 칸 |
-| 6 | region 원천이 지역 필드가 아니다: 나라장터 = 수요기관명, 기업마당 = 소관기관(부처명), 계약 = 기관 분류. 공사현장지역(`cnstrtsiteRgnNm`)은 쓰지 않음 | 지역이 부정확함 | `normalize_region` 입력 — 지역 필터. **공사는 BidWatch가 현장 지역으로 덮음(2026-09-25)**, 용역·물품은 그대로 |
-| 7 | K-Startup organization의 두 번째 폴백 `sprv_inst`는 기관 유형(`민간` 등)이다 | 발주기관 칸에 유형이 표시될 수 있음 | 공고 목록·상세 |
-| 8 | status `"cancelled"`를 만드는 코드가 없다 — 나라장터 취소공고(`ntceKindNm`)도 ongoing/closed (bid-collectors REQUIREMENTS 원칙 ②에 등록됨) | | ~~취소된 공고가 진행중으로 보임~~ — **BidWatch가 원문으로 처리(2026-09-25, F-017)** |
+| 5 | ~~나라장터 공사 budget = 추정가격(부가세 제외). 예산 `bdgtAmt`를 쓰지 않는다~~ **v1.6.0에서 해소**(공사 `bdgtAmt` 배정예산) | 용역·물품과 금액 의미가 다름 | 공고 목록 예산 칸 |
+| 6 | ~~region 원천이 지역 필드가 아니다: 나라장터 = 수요기관명, 기업마당 = 소관기관(부처명), 계약 = 기관 분류~~ **v1.6.0에서 해소**(공사 `cnstrtsiteRgnNm`, 그 외 `""`) | 지역이 부정확함 | 지역 필터 — **용역·물품은 BidWatch가 extra `dminsttNm`으로 종전 결과를 유지**(2026-09-27 사용자 결정, 실측 6,345/6,345건 동일) |
+| 7 | ~~K-Startup organization의 두 번째 폴백 `sprv_inst`는 기관 유형(`민간` 등)이다~~ **v1.6.0에서 해소**(`pbanc_ntrp_nm`만) | 발주기관 칸에 유형이 표시될 수 있음 | 공고 목록·상세 |
+| 8 | ~~status `"cancelled"`를 만드는 코드가 없다~~ **v1.6.0에서 해소**(패키지도 같은 키·값으로 cancelled) | | BidWatch F-017 판정과 결과 같음 — 두 벌 유지(2026-09-26 "안 함") |
 | 9 | ~~K-Startup 진행중 필터를 걸어도 종료 판정을 `totalCount`로 한다~~ **v1.3.1에서 해소**(`matchCount` 기준, 요청 4→3회. 절단 문구 "전체 N건"도 진행중 건수로. odcloud `code<0`은 `errors`로) | 호출 낭비 | 없음 |
 | 10 | ~~문서 파일명 오기 `smes24.py`·`mss_biz.py`~~ **v1.3.1에서 해소** | | 없음 |
 
-> 남은 #2·#5·#6·#7·#8은 표준 필드 값이 바뀌는 일이라 bid-collectors "원칙 ②" Phase(일반 트랙)로 넘어갔다(handover v1.3.1). #6(공사 지역)·#8(취소)은 BidWatch가 이미 원문으로 처리한다.
+> 10건 모두 해소 — #2·#5·#6·#7·#8은 bid-collectors v1.6.0 "원칙 ②"(handover v1.6.0, BidWatch 반영 2026-09-27).
 
 ## 부록 B. handover v1.2.5 §2 표 보정
 

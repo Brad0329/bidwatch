@@ -74,6 +74,8 @@ tenant_matches · subscriptions · notification_settings
   (`work_log/Phase_008.md`)
 - **원천 (2026-09-25)**: 나라장터 공사는 `extra.cnstrtsiteRgnNm`(공사현장), 그 외는 bid-collectors `region`(나라장터는 수요기관명)
   — `services/region.notice_region`. 소급은 같은 함수(538건 반영).
+  **2026-09-27 (bid-collectors v1.6.0)**: 패키지가 공사 region = 현장 지역, 용역·물품 region = `""`로 바꿨다 → 순서를 현장 지역 → region →
+  `extra.dminsttNm`(수요기관명)으로 — 빈 값이면 용역·물품 전부가 모든 지역 필터에 걸리기 때문(사용자 결정). 종전 결과와 6,345/6,345건 같아 소급 없음.
 
 ### 나라장터 차수·취소 — bidwatch가 원문으로 판정 (2026-09-25, F-017 · 2026-09-26 국방·LH·가스공사로 확장 — 007 행)
 - **결정**: 이전 차수는 `superseded`(006), 취소는 기존 `status`에 `'cancelled'`. 둘 다 수집 저장 직후 `extra` 원문으로 bidwatch가 정한다.

@@ -68,12 +68,16 @@ _UNAMBIGUOUS_ALIASES = [(a, s) for a, s in _ALIASES_BY_LENGTH if len(a) >= 4]
 
 
 def notice_region(region: str | None, extra: dict | None) -> str | None:
-    """공고 1건의 저장용 지역. 나라장터 공사는 수요기관명(bid-collectors가 region에 넣는 값)이 아니라
-    공사현장 지역(extra.cnstrtsiteRgnNm)을 쓴다 — 없으면 region으로 대체 (F-011, 2026-09-25).
-    수집(collection.py)과 소급(scripts/backfill_regions.py)이 같이 쓴다."""
-    site = (extra or {}).get("cnstrtsiteRgnNm")
-    if isinstance(site, str) and site.strip():
-        return normalize_region(site)
+    """공고 1건의 저장용 지역. 순서: 공사현장 지역(extra.cnstrtsiteRgnNm) → region → 나라장터 수요기관명
+    (extra.dminsttNm). 수집(collection.py)과 소급(scripts/backfill_regions.py)이 같이 쓴다.
+
+    bid-collectors v1.6.0부터 나라장터 용역·물품의 region은 ""다(수요기관명은 지역이 아니라며 뺐다).
+    BidWatch는 종전대로 수요기관명에서 지역을 뽑는다 — 빈 값은 지역 필터를 늘 통과해
+    용역·물품 전부가 모든 지역에 걸리기 때문(2026-09-27 사용자 결정, F-011)."""
+    extra = extra or {}
+    for raw in (extra.get("cnstrtsiteRgnNm"), region, extra.get("dminsttNm")):
+        if isinstance(raw, str) and raw.strip():
+            return normalize_region(raw)
     return normalize_region(region)
 
 
