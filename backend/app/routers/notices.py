@@ -146,6 +146,15 @@ async def list_notices(
         conds.append(n.c.superseded.is_(False))
         if status != "cancelled":
             conds.append(n.c.status != "cancelled")
+        if status != "closed":
+            # 국방(d2b) 마감 공고는 숨긴다 — v1.6.0부터 수의 2종이 수집 기간 안에 마감된 공고까지 와서 목록의 2/3가
+            # 마감이 됐다(2026-09-27 사용자 결정). status는 수집 시점 값이라 마감일이 지난 것도 함께 본다(오늘 마감은 남긴다)
+            d2b_id = select(SystemSource.id).where(SystemSource.collector_type == "d2b").scalar_subquery()
+            conds.append(~and_(
+                n.c.notice_type == "bid", n.c.source_id == d2b_id,
+                # 마감일 없는 행은 비교가 NULL → NOT NULL로 통째로 빠지므로 false로 막는다
+                or_(n.c.status == "closed", func.coalesce(n.c.end_date < func.current_date(), false())),
+            ))
     if q:
         conds.append(or_(
             n.c.title.ilike(f"%{q}%"), n.c.organization.ilike(f"%{q}%"), n.c.content.ilike(f"%{q}%"),

@@ -456,7 +456,7 @@ bid_no `ALIO-{seq}` · title `rtitle`(공백 정규화) · organization `pname` 
 - 공통: `region`은 **비어 온다**(7일 실측 575건 전부) — 지역은 "지역 미상". `budget`도 비지만 **국방 수의 2종만 v1.6.0부터 `budgetAmount` 예산금액**.
   금액은 extra 원래 이름으로 상세 "금액" 칸에(`NoticeModal.tsx` `InstitutionExtra`). 출처는 bid_no 접두사(`LH-`·`KOGAS-`·`D2B-`·`KWATER-`)로 가린다.
 - v1.6.0: organization `""`(LH·가스·수자원 전부, 국방 국외경쟁) · 국방 url = **사이트 상세 화면**(지명경쟁은 로그인 필요라 목록 화면, 비공식 경로 — `interface.md` §5) ·
-  국방 수의 2종 조회 범위 (오늘-days)~1년 뒤(수집 기간 안에 마감된 closed가 들어온다 — 2026-09-27 days=30 재수집 후 2,524건 중 closed 1,700, 목록에 그대로 보인다: 사용자 결정).
+  국방 수의 2종 조회 범위 (오늘-days)~1년 뒤(수집 기간 안에 마감된 closed가 들어온다 — 2026-09-27 days=30 재수집 후 2,524건 중 closed 1,700 → **공고 목록은 국방 마감 공고를 숨긴다**(status closed 또는 마감일 지남, `routers/notices.py` — 2026-09-27 사용자 결정, F-006).
   LH는 2026-09-27부터 API가 업무 구분을 `"null"`로 줘 url이 첫 화면 + 수집 errors 1줄(`is_partial`).
 - 취소·차수(F-017, `services/collection.py`): LH `bidKind`(일반/정정/취소공고, 같은 행이 덮임 — `bidDegree` 00→01) · 가스 `CANCEL_YN=취소`(3/54) ·
   국방 `pblancSe`(정상/긴급/재/정정/취소공고, 경쟁 3종 130건) · 국방 수의 2종(288건, `pblancSe` 없음)은 `progrsSttus`(진행중/**공개협상취소** 34) —

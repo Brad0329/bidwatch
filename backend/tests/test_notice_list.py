@@ -53,12 +53,13 @@ async def bid_notice(client: AsyncClient):
     """
     created: list[int] = []
 
-    async def make(token: str) -> tuple[int, int]:
+    async def make(token: str, collector_type: str | None = None, suffix: str = "", **fields) -> tuple[int, int]:
         async with get_session_factory()() as db:
-            source_id = await db.scalar(select(SystemSource.id).order_by(SystemSource.id).limit(1))
-            notice = BidNotice(source_id=source_id, bid_no=f"T-{token}", title=f"{token} 청사 공사 입찰",
+            by_type = SystemSource.collector_type == collector_type if collector_type else True
+            source_id = await db.scalar(select(SystemSource.id).where(by_type).order_by(SystemSource.id).limit(1))
+            notice = BidNotice(source_id=source_id, bid_no=f"T-{token}{suffix}", title=f"{token} 청사 공사 입찰",
                                organization="어느기관", url="https://example.go.kr/bid",
-                               start_date=date.today() + timedelta(days=1))
+                               start_date=date.today() + timedelta(days=1), **fields)
             db.add(notice)
             await db.commit()
             created.append(notice.id)
@@ -136,6 +137,32 @@ async def test_source_and_scraper_filters_narrow_to_one_kind(client: AsyncClient
     only_url = await _list(client, headers, scraper_id=src["scraper_id"])
     assert {i["notice_type"] for i in only_bid["items"]} == {"bid"} and only_bid["total"] == 1
     assert {i["notice_type"] for i in only_url["items"]} == {"scraped"} and only_url["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_d2b_closed_notices_hidden_unless_closed_filter(client: AsyncClient, bid_notice):
+    """국방(d2b) 마감 공고는 목록에서 숨긴다 — status closed 또는 마감일 지남. 오늘 마감·마감일 없음은 남는다 (2026-09-27)."""
+    token = uuid.uuid4().hex[:10]
+    headers = await _tenant(client, keyword=token)
+    today = date.today()
+    ids = {}
+    for key, fields in {
+        "closed": {"status": "closed", "end_date": today - timedelta(days=1)},
+        "stale": {"status": "ongoing", "end_date": today - timedelta(days=1)},  # 수집 뒤 마감일이 지남
+        "today": {"status": "ongoing", "end_date": today},
+        "no_end": {"status": "ongoing"},
+    }.items():
+        source_id, ids[key] = await bid_notice(token, "d2b", suffix=f"-{key}", **fields)
+    nara_id, other_closed = await bid_notice(token, "nara", suffix="-nara", status="closed",
+                                             end_date=today - timedelta(days=1))
+    for sid in (source_id, nara_id):
+        r = await client.post(f"/api/sources/system/{sid}/subscribe", headers=headers)
+        assert r.status_code < 300, r.text
+
+    shown = {i["id"] for i in (await _list(client, headers))["items"]}
+    assert shown == {ids["today"], ids["no_end"], other_closed}   # 다른 출처의 마감 공고는 그대로
+    closed = {i["id"] for i in (await _list(client, headers, status="closed"))["items"]}
+    assert closed == {ids["closed"], other_closed}                # 마감을 고르면 보인다
 
 
 @pytest.mark.asyncio
