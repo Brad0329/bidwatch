@@ -25,6 +25,25 @@ async def test_every_system_source_has_a_constructible_collector(monkeypatch):
         assert _get_collector(t) is not None
 
 
+def test_skip_detail_types_are_consistent_with_collector_map():
+    """상세 조회 제외 목록(SKIP_DETAIL_TYPES)도 손으로 쓴 표다 — 새 출처를 빠뜨린 실사례(nara만 넣고 nara_prespec 누락, 5498447).
+
+    ① 제외 목록의 모든 값이 실제 collector_type이다(오타·삭제된 출처 방지)
+    ② 같은 수집기 클래스를 쓰는 collector_type끼리는 제외 여부가 같다 — nara·nara_prespec은 NaraCollector 하나를 쓴다.
+    """
+    from app.services.notice import SKIP_DETAIL_TYPES
+
+    unknown = SKIP_DETAIL_TYPES - COLLECTOR_MAP.keys()
+    assert not unknown, f"COLLECTOR_MAP에 없는 제외 대상: {unknown}"
+
+    by_class: dict[tuple[str, str], set[str]] = {}
+    for t, (module, cls, _) in COLLECTOR_MAP.items():
+        by_class.setdefault((module, cls), set()).add(t)
+    for (_, cls), types in by_class.items():
+        skipped = types & SKIP_DETAIL_TYPES
+        assert skipped in (set(), types), f"{cls}를 쓰는 {sorted(types)} 중 {sorted(skipped)}만 상세 조회 제외"
+
+
 def test_alio_collector_needs_no_api_key():
     collector = _get_collector("alio")
     assert type(collector).__name__ == "AlioCollector"

@@ -10,7 +10,8 @@ from app.schemas.notice import RelatedNotice
 logger = logging.getLogger("bidwatch.notice")
 
 # 나라장터(입찰공고·사전규격)는 fetch_detail이 없다 — 부르면 수집기만 만들고 None.
-# 구현한 수집기: K-Startup(실패 None), 알리오(v1.3.0, 실패 예외 — 첨부·원문 링크 refrUrl)
+# 구현한 수집기: K-Startup(실패 None), 알리오(v1.3.0), 기관 4종 LH·가스·국방·수자원(v1.5.0) — 알리오·기관은 실패 시 예외.
+# 이 표와 COLLECTOR_MAP의 대조: test_skip_detail_types_are_consistent_with_collector_map
 SKIP_DETAIL_TYPES = {"nara", "nara_prespec"}
 
 # 알리오 원문 링크(refrUrl) → 나라장터 공고번호
