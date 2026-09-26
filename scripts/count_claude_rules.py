@@ -8,7 +8,7 @@
 Claude Code 시스템 프롬프트가 이미 약 50개를 쓰므로 CLAUDE.md 예산은 100개 안팎이다.
 종전 "약 15KB" 상한은 한글 3바이트 문자에서 개수를 반영하지 못하는 대리 지표였다.
 
-## 세는 규칙 (CLAUDE.md '비대화 방지' 절과 같아야 한다)
+## 세는 규칙 (`.claude/rules/claude-md-budget.md`와 같아야 한다)
 
 - 글머리(`- `)·번호(`1. `)·표의 데이터 행 하나 = 규칙 하나. 표 머리행·구분행은 제외.
 - `<...>` 플레이스홀더가 든 줄은 제외 — 아직 규칙이 아니라 빈칸이다.
@@ -37,7 +37,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CAP = 100
 INIT_END_MARKER = "초기화 블록 끝"
-# 한 번 통과하면 끝나는 게이트에 붙는 표시 — 조건이 채워지면 그 문장을 지운다(CLAUDE.md '비대화 방지')
+# 한 번 통과하면 끝나는 게이트에 붙는 표시 — 조건이 채워지면 그 문장을 지운다(`.claude/rules/claude-md-budget.md`)
 EXPIRY_MARKER = "⏳만료:"
 
 BULLET = re.compile(r"^\s*(- |\d+\. )")
@@ -103,7 +103,7 @@ def main() -> int:
         for line in expiring:
             print(f"    {line}")
     if n > args.cap:
-        print("  이관 절차: CLAUDE.md 'CLAUDE.md 비대화 방지' ①②③")
+        print("  이관 절차: .claude/rules/claude-md-budget.md ①②③④")
         return 1
     return 0
 

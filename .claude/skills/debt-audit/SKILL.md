@@ -58,4 +58,4 @@ description: Phase 몇 개마다 반복 실수 유형·중복 로직·한 사실
 
 - `docs/playbooks/노하우_프로세스.md` — "문서는 두 번째 방어선", 이동·분리 방법
 - `docs/playbooks/노하우_작업_트랙.md` — 정리 Phase의 트랙 판정
-- CLAUDE.md 'CLAUDE.md 비대화 방지' — 복수 원본 스캔과 짝을 이루는 상한 규칙
+- `.claude/rules/claude-md-budget.md`(CLAUDE.md 비대화 방지) — 복수 원본 스캔과 짝을 이루는 상한 규칙
