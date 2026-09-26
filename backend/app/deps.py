@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
@@ -6,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.tenant import Tenant, User
 from app.services.auth import decode_token
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
@@ -16,6 +20,12 @@ async def get_current_user(
 ) -> User:
     payload = decode_token(credentials.credentials)
     if payload is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    # 리프레시 토큰(7일)을 Bearer로 내밀어도 통과하던 결함(2026-09-26 debt-audit) — 액세스 토큰만 받는다.
+    # 종류가 없는 토큰도 거부한다(fail-closed).
+    if payload.get("type") != "access":
+        logger.warning("액세스가 아닌 토큰으로 인증 시도 거부: type=%r", payload.get("type"))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     user_id = payload.get("sub")

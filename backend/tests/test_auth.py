@@ -95,6 +95,23 @@ async def test_refresh_token(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_refresh_token_is_rejected_as_bearer(client: AsyncClient):
+    """리프레시 토큰(7일)을 액세스 토큰 자리에 내밀면 401 — 종류 확인이 없어 통과하던 결함."""
+    reg = await client.post("/api/auth/register", json={
+        "email": unique_email(),
+        "password": "password123",
+        "name": "User",
+        "company_name": "Corp",
+    })
+    tokens = reg.json()
+    resp = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {tokens['refresh_token']}"})
+    assert resp.status_code == 401
+    # 같은 사용자의 액세스 토큰은 통과 — 거부가 사용자 탓이 아니라 토큰 종류 탓임을 확인
+    resp = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_change_password(client: AsyncClient):
     email = unique_email()
     reg = await client.post("/api/auth/register", json={
