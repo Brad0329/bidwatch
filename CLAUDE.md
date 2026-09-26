@@ -214,7 +214,8 @@ FastAPI + PostgreSQL 백엔드, Next.js 프론트엔드로 만드는 구독형 �
 - **같은 원인의 버그를 고칠 때 다른 층에 같은 판정이 있는지 함께 본다**: 한쪽만 고쳐 재발한 실사례.
 - **Windows + asyncpg는 `WindowsSelectorEventLoopPolicy` 필수** — Proactor 루프와 충돌한다(`Phase_001-003.md`).
 - **라우트가 404인데 코드가 맞아 보이면 uvicorn reload 실패부터 의심** — 재시작으로 해결된 실사례(`Phase_004.md`).
-- **data.go.kr 일일 호출 한도 1,000회**(수집+상세 합산) · 사전규격 API만 `ServiceKey` 대문자(`Phase_005.md`).
+- **data.go.kr 일일 호출 한도는 오퍼레이션별**(대개 1,000회, d2b 100회 — 출처끼리 나눠 쓰지 않는다. 종전 "1,000회 합산"은 틀림,
+  handover v1.4.0 §1 헤더 실측) · 사전규격 API만 `ServiceKey` 대문자(`Phase_005.md`).
 - **지역 정규화는 길이 내림차순 접두어 매칭** — `"경기도 광주시"`가 광주로 잡히는 중의성(`Phase_008.md`).
 - **JSONB 함정 2가지** (2026-09-25): ① `extra->>'…'` 조건을 플래너가 1행으로 오판해 CTE+UPDATE가 중첩 루프로 20초 — 출처 단위 대량 판정은
   행을 읽어 파이썬에서(`refresh_revisions`) ② 모델에서 None을 넣은 JSONB는 SQL NULL이 아니라 JSON `null`로 저장된다 — SQL `IS NULL`로 못 찾는다.

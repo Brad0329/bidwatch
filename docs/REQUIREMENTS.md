@@ -77,7 +77,8 @@
     "미공개", 가스공사는 금액 없음)과 기관별 상세(계약 방법·개찰 일시·LH 지역 제한·필요 면허 등)가 보인다 (사용자 실테스트)
 - **출처 묶음 — 입찰 공고 / 지원사업(선택) (2026-09-25, 목업 "이대로")**: 묶음의 정의는 `backend/app/services/source_category.py`
   한 곳(API의 `category`·`source_category`로 내려간다 — 화면에 같은 목록을 두지 않는다). 새 회사는 아무 출처도 구독하지 않은 채 시작한다.
-  - [x] 출처 목록 API가 출처마다 category를 준다 — 나라장터·사전규격·알리오 = bid, K-Startup·기업마당·중소벤처기업부·보조금24 = support.
+  - [x] 출처 목록 API가 출처마다 category를 준다 — 나라장터·사전규격·알리오·기관 4종(LH·가스공사·국방·수자원, 2026-09-26) = bid,
+    K-Startup·기업마당·중소벤처기업부·보조금24 = support.
     새 회사의 구독 목록은 비어 있다 → `test_system_sources_have_category`
   - [x] 공고 목록·상세 응답의 `source_category`가 출처 묶음을 따른다 → `test_notice_source_category_in_list_and_detail`
   - [x] (2026-09-25 추가) 공고 목록 `category=bid|support`로 묶음 전체만 — 건수(total)도 묶음대로, 다른 값은 422.
@@ -165,7 +166,8 @@
     → `test_unsafe_url_rejected_without_detail` · `test_url_guard.py`(리다이렉트로 내부망 가는 요청 차단 포함)
   - [x] 같은 URL을 두 번 추가해도 스크래퍼는 1개다 → `test_add_same_url_twice`
   - [x] 구독이 없으면 빈 목록 → `test_list_subscriptions_empty`
-  - [ ] 미리보기 실패 시 응답에 예외 원문이 노출되지 않는다 → **현재 위반**(plan.md 보류 항목)
+  - [x] 미리보기 실패 시 응답에 예외 원문이 노출되지 않는다(원인은 로그에만) → `test_preview_uses_ssrf_hook_and_hides_error_detail`
+    (종전 "현재 위반" 표기는 해소 후 갱신 누락 — 2026-09-26 debt-audit에서 정정)
   - [x] AI 설정은 시험 수집을 통과해야 반환된다 — 0건·제목 커버리지 50% 미만·제목 길이 중앙값 8자 미만이면 탈락
     → `test_judge_rejects_zero_notices` · `test_judge_rejects_low_coverage` · `test_judge_rejects_label_like_titles`
   - [x] 탈락하면 이유를 AI에게 알려 최대 3회까지 재생성하고, 모두 탈락하면 실패(`시험 수집 실패(3회 시도)`)
@@ -323,11 +325,11 @@
 
 1. **인증 방식**: 계정(이메일+비밀번호, bcrypt) + JWT(access 30분 / refresh 7일, HS256). 테넌트 단위 격리, 역할 3종(F-002).
 2. **공개 범위**: 인터넷 공개 SaaS 예정(회원가입 공개). 구체적 노출 표면(관리자 API의 IP 제한 여부 등)은 Phase 011에서 확정 — 미정.
-3. **성능·기타**: 목록 페이지 크기 최대 100. 공고 10만 건+ 대응(FTS 전환 등)은 '이후 단계'. data.go.kr 일일 1,000회 한도 안에서 수집.
+3. **성능·기타**: 목록 페이지 크기 최대 100. 공고 10만 건+ 대응(FTS 전환 등)은 '이후 단계'. data.go.kr 일일 한도(오퍼레이션별 — 대개 1,000회, 국방 d2b 100회. 근거: bid-collectors handover v1.4.0 §1 응답 헤더 실측) 안에서 수집.
 
 ## 하지 않는 것 (Out of Scope)
 - 다국어 · 모바일 앱 · 외부 공개 API
-- (Phase 1 범위에서) 결제·알림·AI 매칭 — `work_log/plan.md` '이후 단계'
+- (배포 Phase 011까지의 범위에서) 결제·알림·AI 매칭 — `work_log/plan.md` '이후 단계'
 - **지원사업 전용 메뉴·지원사업용 키워드 분리 — 안 함 (2026-09-25 사용자 결정)**: 목업까지 만들었으나 입찰 전문으로 좁히며 폐기.
   지원사업은 선택 구독 + "지원" 배지로 충분하다(위 시스템 목표). 다시 열 조건: AI 매칭(프리미엄)에서 "우리 회사가 받을 수 있는
   지원사업 알림"을 만들 때(중소벤처24 API의 구조화된 자격조건 — `plan.md` 이후 단계)

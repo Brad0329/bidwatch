@@ -127,10 +127,8 @@
 
 - **`/debt-audit` 2026-09-26 (Phase 008 이후 첫 회) — 사용자 결정: ② 곁가지(항목별 커밋), 보안 결함·v1.5.0 먼저.**
   목록 원문은 이 세션 보고(반복 실수 7·중복 로직 22·복수 원본 17). 처리 상태:
-  - 완료: 리프레시 토큰을 Bearer로 받던 결함(`e5ad9d9`) · handover v1.5.0 반영(interface.md 동기화)
-  - 진행 예정(권고 순서): ① 이미 어긋난 문서 9건(REQUIREMENTS F-009 "현재 위반"이 실제로는 해소됨 · system_design 출처 7→11개·태그 3→5개·
-    Celery 확정처럼 적힘 · api_spec 관심 지역·`category` 누락 · data.go.kr 한도 "1,000 합산" vs "오퍼레이션별" 모순 · plan.md 옛 행 번호 ·
-    source_fields 머리말 버전 · qa-tester 빈 자리표시) ② 기존 lint 경고 `CollectionButton.tsx` `sourceName`(8커밋째 방치) ③ ruff로 `datetime.utcnow`
+  - 완료: 리프레시 토큰을 Bearer로 받던 결함(`e5ad9d9`) · handover v1.5.0 반영(`04cd87d`) · ① 이미 어긋난 문서 9건
+  - 진행 예정(권고 순서): ② 기존 lint 경고 `CollectionButton.tsx` `sourceName`(8커밋째 방치) ③ ruff로 `datetime.utcnow`
     금지 + bid_notices upsert 시각 테스트 ④ `COLLECTOR_MAP`↔system_sources↔상세 조회 여부 대조 테스트
   - 미착수(사용자가 고를 것): 테스트 전용 DB(일반 — 아래 항목) · 사전규격 목록 정렬·취소 제외 누락(`notices.py:291`) · 비밀번호 길이 백엔드 검증 ·
     미리보기 URL 사전 확인 · `clean_title` 공공 출처 미적용(일반) · 취소 판정 두 벌(일반) · upsert 두 벌의 new/updated 건수 오류 ·
@@ -145,8 +143,8 @@
   이전 테스트 잔재도 있다(기본 제공이 아니라 화면에는 안 나옴). 분리하려면 테스트 전용 DB + alembic upgrade 픽스처(일반 트랙 — 사용자 확인 필요).
   **2026-09-25 추가 실례**: scraped_notices에 "예시기관" 사이트 공고 794건(테스트 잔재로 보임) — 직접 추가 사이트 분석을 왜곡했다(분석에서 제외).
   또 F-017 차수 정리 테스트가 nara 출처 전체에 refresh_revisions를 돌려 실제 개발 데이터를 바꿨다(결과는 옳았지만 테스트가 실데이터를 만진 것).
-- **수용 기준의 테스트 미대응** — F-004~F-008·F-010·F-011 필터 부분은 백엔드 테스트가 없다(`docs/REQUIREMENTS.md`에
-  항목별 표시). 해당 기능을 다음에 건드릴 때 그 기능의 테스트부터 붙인다.
+- **수용 기준의 테스트 미대응** — F-004~F-008·F-010 일부는 백엔드 테스트가 없다(`docs/REQUIREMENTS.md`에
+  항목별 표시. F-011 지역 필터는 `test_region_filter.py`가 있다 — 2026-09-26 정정). 해당 기능을 다음에 건드릴 때 그 기능의 테스트부터 붙인다.
 - **AI 스크래퍼 성공률 1차 실측 (2026-09-23, claude-opus-5, `backend/scripts/measure_ai_scraper.py`)** —
   lets_portal 손 설정 39곳을 정답으로 비교. 기준선(손 설정) 1건 이상인 **29곳 중 성공 13곳(45%)**.
   실패 16곳 원인: ① AI 응답이 JSON이 아님 8곳(HTML 이어쓰기·"Assistant{" 등 — 50K에서 잘린 HTML 뒤에

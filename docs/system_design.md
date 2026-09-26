@@ -52,10 +52,13 @@
 
 ### 2.2 목표 구조 (향후)
 
+> 비동기 실행 방식(Celery+Redis / APScheduler / OS 스케줄러)은 **미정 — Phase 009에서 결정**(`work_log/plan.md` '미정').
+> 정기 수집 주기는 REQUIREMENTS F-013(1일 1~2회). 아래는 할 일의 목록이지 방식 결정이 아니다.
+
 ```
 현재 구조 +
-    [Celery Workers + Redis]
-        ├── 정기 수집 — 공공 API (1일 2회)
+    [비동기 작업 실행기 — Phase 009 결정]
+        ├── 정기 수집 — 공공 API (F-013)
         ├── 정기 수집 — 스크래퍼 URL (구독자 있는 것만)
         ├── AI URL 분석 (비동기)
         ├── AI 프로필 매칭 (배치)
@@ -67,7 +70,7 @@
 ```
 [공유 데이터 — 전체 고객]
   ├── bid_notices          공공 API 수집 공고
-  ├── system_sources       공공 API 출처 정보 (7개: nara, nara_prespec, kstartup, bizinfo, subsidy24, smes, alio)
+  ├── system_sources       공공 API 출처 정보 (목록의 원본 = 마이그레이션 행·`tasks/collect_api.py` COLLECTOR_MAP)
   ├── scraper_registry     URL별 스크래퍼 설정 (AI 생성)
   └── scraped_notices      스크래퍼 수집 공고
 
@@ -75,7 +78,7 @@
   ├── tenant_system_subscriptions  공공 API 출처 구독
   ├── tenant_source_subscriptions  커스텀 스크래퍼 구독
   ├── tenant_keywords              키워드
-  ├── tenant_tags                  태그 (검토요청, 입찰대상, 제외)
+  ├── tenant_tags                  태그 (값 목록의 원본 = `schemas/tag.py` VALID_TAGS)
   └── users                        사용자 (역할: owner/admin/member)
 ```
 
@@ -86,7 +89,7 @@
 
 ---
 
-## 3. 사용자/관리자 분리 (Phase 1-6에서 구현)
+## 3. 사용자/관리자 분리 (Phase 006에서 구현)
 
 ### 역할 모델
 - **owner**: 테넌트 생성 시 자동 부여, 모든 권한
@@ -119,10 +122,12 @@
 | 중소벤처기업부 | smes | SmesCollector |
 | 알리오 공공기관 입찰공고 | alio | AlioCollector (API 키 없음, 2026-09-24) |
 
+(표는 대표만 — 기관 출처 lh·kogas·d2b·kwater(마이그레이션 007) 등 **전체 목록의 원본은 `tasks/collect_api.py` COLLECTOR_MAP**이다.)
+
 ### 수집 방식
 - 현재: 관리자가 수동 실행 (sync 모드, POST /api/admin/collection/run)
 - 연쇄 수집: nara 수집 시 nara_prespec 자동 수집 (CHAINED_COLLECTORS)
-- 향후: Celery Beat 정기 수집
+- 향후: 정기 수집 — 방식은 Phase 009에서 결정(2.2)
 
 ### AI 스크래퍼 (커스텀 URL)
 1. owner·admin이 URL 제출 → URL 정규화 + 해시 + SSRF 형식 검사(`services/url_guard.py`)

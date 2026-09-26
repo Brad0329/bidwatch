@@ -23,6 +23,7 @@ GET    /api/notices                공고 목록 (구독한 공공 출처 + URL 
                                    — 항목의 notice_type(bid|scraped)+id가 식별자, scraper_id로 URL 출처만 좁힘
                                    ?page=1&page_size=20&q=검색어&source_id=1&status=ongoing
                                    &tag=검토요청&region=서울,부산   (page_size 최대 100)
+                                   &category=bid|support   (전체 출처(입찰)/(지원) — 직접 추가 사이트는 bid, F-004)
 GET    /api/notices/pre-specs      입찰 예고(사전규격) 목록 (nara_prespec 고정)
                                    ?page=1&page_size=20&q=검색어&status=ongoing&tag=...&region=...
 GET    /api/notices/regions        지역 목록 (17개 시/도 상수)
@@ -43,7 +44,7 @@ DELETE /api/tags/{tag_id}                      태그 삭제
 ## 프로필 (`/api/profile`) [인증 필요]
 
 ```
-GET    /api/profile/regions        관심 지역 조회
+GET    /api/profile/regions        관심 지역 조회   — 화면에서는 안 쓴다(2026-09-24 폐기, F-011). AI 매칭·알림 후보로 API만 유지
 PUT    /api/profile/regions        관심 지역 저장 (콤마 구분 문자열로 저장)
 ```
 
@@ -100,7 +101,7 @@ GET    /api/health                  서버 상태 확인
 /notices             공고 목록 (검색, 필터, 페이지네이션, 상세 모달)
 /pre-notices         입찰 예고 (사전규격 공고)
 /review              검토요청 (검토요청 태그 공고)
-/settings            사용자설정 (구독 출처 + 키워드 + 관심 지역)
+/settings            사용자설정 (구독 출처 + 키워드)
 /admin               관리자설정 (수집 관리) — owner/admin만 접근
 ```
 

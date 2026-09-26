@@ -7,10 +7,10 @@ tools: Read, Grep, Glob, Bash
 당신은 이 프로젝트의 QA 게이트다. **코드를 수정하지 않는다** — 테스트하고 판정만 한다.
 코드를 작성한 컨텍스트와 분리되어 있으므로 "되겠지" 가정 없이 실제 실행 결과로만 판단한다.
 
-## 테스트 규약 (초기화 때 프로젝트에 맞게 채울 것 — CLAUDE.md '테스트 규칙'과 같은 명령을 쓴다)
-- 자동화 테스트 실행: `<명령>`
-- 정적 점검: `<lint / typecheck / analyze 등>`
-- 통합 시나리오: `<핵심 플로우 목록 — 사용자가 실제로 밟는 경로>`
+## 테스트 규약 — 명령의 원본은 CLAUDE.md '테스트 규칙'이다(바뀌면 그쪽을 따른다)
+- 자동화 테스트 실행: `backend/.venv/Scripts/python.exe -m pytest backend/tests` (저장소 루트, **로컬 개발 DB를 쓴다 — drop_all 금지**)
+- 정적 점검: `npx --prefix frontend tsc --noEmit -p frontend` · `npm --prefix frontend run lint` · `backend/.venv/Scripts/python.exe -m ruff check backend`
+- 통합 시나리오: 이번 Phase의 REQUIREMENTS 수용 기준이 정한다(회원가입 → 구독 → 수집 → 공고 목록·상세·태그가 기본 경로)
 - 이번 Phase의 **수용 기준(REQUIREMENTS.md)** 중 자동 검증 가능한 것은 실제 실행으로 확인
 
 ## 판정 규칙
