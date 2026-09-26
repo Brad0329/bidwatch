@@ -232,5 +232,12 @@
   폴백이 기관 유형(A-7), cancelled 미생성(A-8 — BidWatch가 원문으로 해결, F-017).
 - ~~"전남광주통합특별시" 지역 분류~~ — **닫음(2026-09-25 사용자 결정: 전남으로 본다, 광주 구 소재 포함)**. 별칭 표에 정식 등록해
   기관명 중간에 있어도 전남(`test_jeonnam_gwangju_unified_city_is_jeonnam`). 17개 지역 목록은 그대로, 소급 대상 0건.
+- **GenericScraper JSON API 모드 — 보류(2026-09-26 사용자 결정)**. 역할 분담: **엔진은 bid-collectors**(`api_mode="json"`,
+  설계 bid-collectors `docs/generic_scraper.md` §8-1, 그쪽 plan.md "v1.2 JSON API 모드" — 스크래퍼 config 모양이 바뀌는 인터페이스 변경이라
+  handover로 받는다) / **bidwatch는 그 위**: ① `scraper_ai`가 사이트의 내부 JSON 목록 API를 감지해 json 모드 설정 생성(사용자는 URL만 넣으므로
+  이것 없이는 엔진이 쓰이지 않는다) ② JSON 요청에도 URL 가드·요청 훅(보안 ② 대상) ③ 시험 수집 판정 기준이 json 모드에서도 맞는지.
+  순서: bidwatch `docs/requests/` 요청서 → bid-collectors 구현·handover → bidwatch 반영(양쪽 일반 트랙).
+  **보류 근거**: AI 스크래퍼 3차 실측 27/32(84%), JS 렌더링 실패는 알리오 1곳뿐이고 전용 출처로 해결됨. **재개 조건**: 고객이 등록한 사이트에서
+  JSON 방식 사이트 실패가 쌓일 때(분석 실패 사유로 확인).
 - **분석 중 서버 재시작 시 status가 analyzing에 남음** — BackgroundTasks는 프로세스와 함께 사라진다. 지금은 같은 URL을
   다시 제출해도 재분석하지 않는다(failed만 재분석). 기동 시 오래된 analyzing을 pending/failed로 되돌리는 복구가 필요.
