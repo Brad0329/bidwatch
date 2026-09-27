@@ -57,6 +57,12 @@
           },
           {
             "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_shell_file_write.py\"",
+            "timeout": 10,
+            "statusMessage": "셸 파일 쓰기 검사"
+          },
+          {
+            "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/no_env_prefix.py\"",
             "timeout": 10,
             "statusMessage": "환경변수 접두사 검사"

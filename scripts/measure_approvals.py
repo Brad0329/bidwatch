@@ -175,15 +175,30 @@ def transcript_dir() -> Path:
     return Path.home() / ".claude" / "projects" / slug
 
 
+def with_subagents(mains: list[Path]) -> list[Path]:
+    """본 세션마다 그 세션이 띄운 서브에이전트 기록(`<세션ID>/subagents/*.jsonl`)을 붙인다.
+
+    ★ 서브에이전트는 본 세션 파일에 호출이 안 남는다. 본 세션만 세면 **조사·QA를 맡긴 쪽의 대기를
+      통째로 놓친다** — bid-collectors 2026-09-26: 8초 초과 셸 호출의 57%가 서브에이전트.
+      bidwatch 2026-09-27: 서브에이전트 Bash 388건 중 81건이 8초 초과, `cat > scripts/_tmp/…` 69건 중 62건.
+    """
+    out: list[Path] = []
+    for m in mains:
+        out.append(m)
+        out.extend(sorted((m.parent / m.stem / "subagents").glob("*.jsonl")))
+    return out
+
+
 def find_sessions(spec: str | None, count: int) -> list[Path]:
+    """본 세션 + 그 서브에이전트 기록. 첫 원소부터 본 세션 순서대로."""
     d = transcript_dir()
     if spec:
         p = Path(spec)
         if p.exists():
-            return [p]
+            return with_subagents([p])
         p = d / f"{spec}.jsonl"
         if p.exists():
-            return [p]
+            return with_subagents([p])
         raise SystemExit(f"세션을 찾지 못했다: {spec}\n  찾아본 곳: {d}")
     if not d.exists():
         raise SystemExit(
@@ -192,7 +207,19 @@ def find_sessions(spec: str | None, count: int) -> list[Path]:
     files = sorted(d.glob("*.jsonl"), key=lambda f: f.stat().st_mtime, reverse=True)
     if not files:
         raise SystemExit(f"세션 파일(.jsonl)이 없다: {d}")
-    return files[:count]
+    return with_subagents(files[:count])
+
+
+def print_sessions(paths: list[Path]) -> None:
+    """[대상 세션] — 본 세션은 한 줄씩, 서브에이전트는 세션별 개수로(측정기 2종이 같이 쓴다)."""
+    print("[대상 세션]")
+    for p in paths:
+        if p.parent.name == "subagents":
+            continue
+        subs = [s for s in paths if s.parent == p.parent / p.stem / "subagents"]
+        size = sum(s.stat().st_size for s in subs)
+        extra = f" + 서브에이전트 {len(subs)}개 ({size / 1e6:.1f} MB)" if subs else ""
+        print(f"  {p.name}  ({p.stat().st_size / 1e6:.1f} MB){extra}")
 
 
 def shell_calls(paths: list[Path]) -> list[tuple[str, str]]:
@@ -422,9 +449,7 @@ def main() -> int:
     paths = find_sessions(args.session, args.sessions)
     calls = shell_calls(paths)
 
-    print("[대상 세션]")
-    for p in paths:
-        print(f"  {p.name}  ({p.stat().st_size / 1e6:.1f} MB)")
+    print_sessions(paths)
 
     if not calls:
         # 0건은 '깨끗함'이 아니다 — 파싱이 깨졌거나 엉뚱한 파일을 봤다는 뜻이다.
