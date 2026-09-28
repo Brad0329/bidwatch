@@ -23,6 +23,9 @@ out/
 .commit_msg.txt
 scripts/_tmp/
 
+# 승인 창 기록 (.claude/hooks/log_permission_request.py — 측정기가 읽는다. 사용자 데이터)
+.claude/permission_requests.jsonl
+
 # 테스트 캐시
 .pytest_cache/
 
