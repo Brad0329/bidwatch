@@ -8,6 +8,7 @@ export default function KeywordForm() {
   const [error, setError] = useState("");
   const createMutation = useCreateKeyword();
 
+  // eslint-disable-next-line complexity -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

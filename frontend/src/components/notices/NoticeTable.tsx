@@ -31,6 +31,7 @@ function getDday(endDate: string | null): { text: string; urgent: boolean } {
   return { text: `D-${diff}`, urgent: diff <= 3 };
 }
 
+// eslint-disable-next-line max-lines-per-function -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
 export default function NoticeTable({ notices, onFilterByKeyword, onFilterByOrg, onSelectNotice }: Props) {
   if (!notices.length) {
     return (
@@ -57,6 +58,7 @@ export default function NoticeTable({ notices, onFilterByKeyword, onFilterByOrg,
       </div>
 
       {/* Rows */}
+      {/* eslint-disable-next-line complexity, max-lines-per-function -- 규칙 켜기 전부터 넘음(2026-09-30) */}
       {notices.map((notice) => {
         // 취소 공고는 검토요청 등 태그 목록에만 나온다(F-017) — 마감일 자리에 "취소"
         const dday = notice.status === "cancelled" ? { text: "취소", urgent: true } : getDday(notice.end_date);

@@ -181,6 +181,8 @@ FastAPI + PostgreSQL 백엔드, Next.js 프론트엔드로 만드는 구독형 �
 - 백엔드: `backend/.venv/Scripts/python.exe -m pytest backend/tests` (저장소 루트에서, 약 7초)
   ⚠️ **테스트가 로컬 개발 DB(`backend/.env`의 DATABASE_URL)를 그대로 쓴다** — `drop_all` 금지(시드 삭제 실사례).
 - 정적 분석: 백엔드 `backend/.venv/Scripts/python.exe -m ruff check backend` · 프론트 `npx --prefix frontend tsc --noEmit -p frontend` · `npm --prefix frontend run lint`
+  — **복잡도·함수 길이 규칙을 켠다**(ruff `C901`, eslint `complexity`·`max-lines-per-function`). 사다리의 "정적 분석 1회"가
+  매 변경마다 도니, 사람이 읽기 힘든 코드는 규칙 문장이 아니라 여기서 잡힌다. 켜기 전부터 넘던 함수만 그 함수 한 줄 예외.
 - 동봉 파이썬 도구(훅·측정기)의 테스트: `python -m pytest tests` — **훅·측정기·CLAUDE.md를 고쳤을 때만**.
 - **수용 기준 = 테스트 케이스**: REQUIREMENTS.md의 각 `[ ]` 항목이 테스트 하나에 대응해야 한다.
   **예외**: 표시 기준은 `(사용자 실테스트)` 항목 하나로 적고 테스트를 대응시키지 않는다('검증 강도'의 표시 변경).

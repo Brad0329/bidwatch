@@ -8,6 +8,7 @@ import NoticeTable from "@/components/notices/NoticeTable";
 import NoticeModal from "@/components/notices/NoticeModal";
 import type { BidNotice } from "@/types";
 
+// eslint-disable-next-line complexity, max-lines-per-function -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
 export default function ReviewPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");

@@ -21,7 +21,7 @@ def _partial_note(result: dict) -> str:
 
 
 @router.post("/collection/run", response_model=CollectionRunResponse)
-async def collection_run(
+async def collection_run(  # noqa: C901 — 복잡도 규칙 켜기 전부터 12(2026-09-30), 새로 늘리지 않는다
     req: CollectionRunRequest,
     user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),

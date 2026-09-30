@@ -51,7 +51,7 @@ def _revision_of(row) -> tuple[str, str, bool]:
     return row.bid_no.rsplit("-", 1)[0], row.d2b_ord or "", cancel
 
 
-async def refresh_revisions(source_id: int, db: AsyncSession) -> dict:
+async def refresh_revisions(source_id: int, db: AsyncSession) -> dict:  # noqa: C901 — 켜기 전부터 19(2026-09-30)
     """차수 정리(나라장터·국방) — 수집 저장 직후 출처 전체를 다시 계산한다(재수집이 status를 덮어도 되살아난다).
 
     1. 같은 공고번호에 더 높은 차수가 있으면 superseded (차수는 정수 비교: "009" < "010")

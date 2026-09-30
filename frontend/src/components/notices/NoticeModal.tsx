@@ -37,6 +37,7 @@ function getDday(endDate: string | null): { text: string; color: string } {
   return { text: `D-${diff}`, color: "text-blue-600" };
 }
 
+// eslint-disable-next-line complexity, max-lines-per-function -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
 export default function NoticeModal({ notice: initialNotice, onClose, onTagChange, nested }: Props) {
   const [notice, setNotice] = useState(initialNotice);
   const [loading, setLoading] = useState(false);
@@ -441,6 +442,7 @@ function ExtraSection({ title, rows }: { title: string; rows: Row[] }) {
 }
 
 /* 나라장터 입찰공고 (용역·물품·공사) — 조달청 입찰공고정보서비스 원문 키 */
+// eslint-disable-next-line complexity -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
 function NaraExtra({ ex, bidNo }: { ex: Extra; bidNo: string }) {
   const tech = text(ex.techAbltEvlRt);
   const price = text(ex.bidPrceEvlRt);
@@ -564,6 +566,7 @@ function lhDetailLicenses(ex: Extra): Row[] {
   ]);
 }
 
+// eslint-disable-next-line complexity, max-lines-per-function -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
 function InstitutionExtra({ ex, kind }: { ex: Extra; kind: Institution }) {
   let title: string;
   let amounts: Row[] = [];

@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import type { TokenResponse, User } from "@/types";
 
+// eslint-disable-next-line max-lines-per-function -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
 export default function RegisterPage() {
   const router = useRouter();
   const { login, setUser } = useAuthStore();

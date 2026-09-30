@@ -73,7 +73,7 @@ async def find_related(notice: BidNotice, source: SystemSource, db: AsyncSession
     return [RelatedNotice(id=r.id, kind=kind, bid_no=r.bid_no, title=r.title, status=r.status) for r in rows]
 
 
-async def enrich_notice_detail(
+async def enrich_notice_detail(  # noqa: C901 — 복잡도 규칙 켜기 전부터 11(2026-09-30), 새로 늘리지 않는다
     notice: BidNotice, source: SystemSource, db: AsyncSession
 ) -> None:
     """content가 비어있으면 bid-collectors fetch_detail로 보충 후 DB에 저장.

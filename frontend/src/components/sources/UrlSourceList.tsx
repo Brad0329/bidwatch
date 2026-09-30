@@ -17,6 +17,7 @@ const STATUS_BADGE: Record<ScraperStatus, { label: string; className: string; ic
   failed: { label: "자동 인식 실패", className: "bg-red-50 text-red-600", icon: "ri-error-warning-line" },
 };
 
+// eslint-disable-next-line max-lines-per-function -- 규칙 켜기 전부터 넘음(2026-09-30), 새로 늘리지 않는다
 export default function UrlSourceList() {
   const { user } = useAuthStore();
   const canAdd = !!user && ["owner", "admin"].includes(user.role);
@@ -76,6 +77,7 @@ export default function UrlSourceList() {
         <div className="text-sm text-gray-400 py-2">추가한 사이트가 없습니다</div>
       ) : (
         <ul className="space-y-2">
+          {/* eslint-disable-next-line complexity -- 규칙 켜기 전부터 넘음(2026-09-30) */}
           {active.map((s) => {
             const badge = STATUS_BADGE[s.scraper_status] ?? STATUS_BADGE.pending;
             const name = s.custom_name || (s.scraper_name !== s.scraper_url ? s.scraper_name : "");

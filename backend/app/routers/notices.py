@@ -93,7 +93,7 @@ def _match_keywords(title: str, content: str, keywords: list[str]) -> list[str]:
 
 
 @router.get("", response_model=NoticeListResponse)
-async def list_notices(
+async def list_notices(  # noqa: C901 — 복잡도 규칙 켜기 전부터 13(2026-09-30), 새로 늘리지 않는다
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     q: str | None = None,
