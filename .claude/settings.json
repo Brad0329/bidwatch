@@ -3,7 +3,6 @@
     "PYTHONIOENCODING": "utf-8"
   },
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [],
     "deny": [
       "Bash(rm -rf *)",
